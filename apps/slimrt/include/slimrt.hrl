@@ -25,7 +25,7 @@
 -define(POLL_TIMEOUT, 27000).
 
 %each subscriber has a ticket:)
--record(slimrt_subscriber, {
+-record(slim_subscriber, {
     ticket		:: ticket(),
     spid		:: pid(),
     ref			:: reference(),
@@ -35,7 +35,7 @@
 }).
 
 %show: ['available', 'away', 'chat', 'dnd', 'invisible', 'unavailable']
--record(slimrt_endpoint, {
+-record(slim_endpoint, {
     oid		:: oid(), 
     name	:: binary(),
     nick	:: binary(),
@@ -44,18 +44,18 @@
     status = <<>>		:: binary()
 }).
 
--record(slimrt_roster, {
+-record(slim_roster, {
     oid		:: oid(),
     fid		:: oid()
 }).
 
 %gid is a oid
--record(slimrt_room, {
+-record(slim_room, {
 		gid		:: oid(), %room oid
 		oid		:: oid(), % member oid
 		nick	:: binary()}).
 
--record(slimrt_route, {
+-record(slim_route, {
 		oid		:: oid(),
 		pid		:: pid(),
 		show	:: binary(),
