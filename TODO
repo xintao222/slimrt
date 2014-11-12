@@ -1,0 +1,4 @@
+eunit
+
+{cover_enabled, true}.
+

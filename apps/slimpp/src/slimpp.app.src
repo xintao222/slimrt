@@ -1,0 +1,16 @@
+{application, slimpp,
+ [
+  {description, "Simple, Light Instant Message and Presence Protocol library"},
+  {vsn, git},
+  {modules, [
+             slimpp,
+			 slimpp_oid,
+			 slimpp_topic
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
