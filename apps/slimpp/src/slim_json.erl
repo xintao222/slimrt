@@ -20,45 +20,16 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--define(IDLE_TIMEOUT, 10000).
+-module(slim_json).
 
--define(POLL_TIMEOUT, 27000).
+-include("slimpp.hrl").
 
-%each subscriber has a ticket:)
--record(slimrt_subscriber, {
-    ticket		:: ticket(),
-    spid		:: pid(),
-    ref			:: reference(),
-    mon			:: reference(),
-    type		:: atom(),
-    packets=[]	:: list()
-}).
+-export([encode/1,
+		 jsonify/1]).
 
-%show: ['available', 'away', 'chat', 'dnd', 'invisible', 'unavailable']
--record(slimrt_endpoint, {
-    oid		:: oid(), 
-    name	:: binary(),
-    nick	:: binary(),
-    domain	:: binary(),
-    show = available	:: available | away | chat | dnd | invisible | unavailable,
-    status = <<>>		:: binary()
-}).
+encode(Packets) when is_list(Packets) ->
+	jsonify({data, Packets}).
 
--record(slimrt_roster, {
-    oid		:: oid(),
-    fid		:: oid()
-}).
-
-%gid is a oid
--record(slimrt_room, {
-		gid		:: oid(), %room oid
-		oid		:: oid(), % member oid
-		nick	:: binary()}).
-
--record(slimrt_route, {
-		oid		:: oid(),
-		pid		:: pid(),
-		show	:: binary(),
-		mon		:: reference()
-}).
-
+jsonify(Term) ->
+    iolist_to_binary(mochijson2:encode(Term)).
+	

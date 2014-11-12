@@ -1,4 +1,3 @@
-%%-----------------------------------------------------------------------------
 %% Copyright (c) 2014, Feng Lee <feng.lee@slimchat.io>
 %% 
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,16 +19,7 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimpp_json).
+-module(slimrt_mqttd).
 
--include("slimpp.hrl").
 
--export([encode/1,
-		 jsonify/1]).
 
-encode(Packets) when is_list(Packets) ->
-	jsonify({data, Packets}).
-
-jsonify(Term) ->
-    iolist_to_binary(mochijson2:encode(Term)).
-	

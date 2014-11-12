@@ -20,45 +20,4 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--define(IDLE_TIMEOUT, 10000).
-
--define(POLL_TIMEOUT, 27000).
-
-%each subscriber has a ticket:)
--record(slimrt_subscriber, {
-    ticket		:: ticket(),
-    spid		:: pid(),
-    ref			:: reference(),
-    mon			:: reference(),
-    type		:: atom(),
-    packets=[]	:: list()
-}).
-
-%show: ['available', 'away', 'chat', 'dnd', 'invisible', 'unavailable']
--record(slimrt_endpoint, {
-    oid		:: oid(), 
-    name	:: binary(),
-    nick	:: binary(),
-    domain	:: binary(),
-    show = available	:: available | away | chat | dnd | invisible | unavailable,
-    status = <<>>		:: binary()
-}).
-
--record(slimrt_roster, {
-    oid		:: oid(),
-    fid		:: oid()
-}).
-
-%gid is a oid
--record(slimrt_room, {
-		gid		:: oid(), %room oid
-		oid		:: oid(), % member oid
-		nick	:: binary()}).
-
--record(slimrt_route, {
-		oid		:: oid(),
-		pid		:: pid(),
-		show	:: binary(),
-		mon		:: reference()
-}).
-
+-module(slim_message).

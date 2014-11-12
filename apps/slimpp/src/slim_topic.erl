@@ -20,7 +20,7 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimpp_topic).
+-module(slim_topic).
 
 -include("slimpp.hrl").
 

@@ -20,7 +20,7 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimpp_oid).
+-module(slim_oid).
 
 -include("slimpp.hrl").
 
@@ -44,19 +44,19 @@ make({Class, Domain, Name}) when is_atom(Class) and is_binary(Domain) and is_bin
 %%
 -spec make(Class :: oid_class(), Domain :: binary(), Name :: binary()) -> oid().
 make(Class, Domain, Name) when is_atom(Class) and is_binary(Domain) and is_binary(Name) ->
-    #slimpp_oid{domain = Domain, class = Class, name = Name}.
+    #slim_oid{domain = Domain, class = Class, name = Name}.
 
 -spec class(Oid :: oid()) -> atom().
-class(Oid) when is_record(Oid, slimpp_oid) -> Oid#slimpp_oid.class.
+class(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.class.
 
 -spec domain(Oid :: oid()) -> binary().
-domain(Oid) when is_record(Oid, slimpp_oid) -> Oid#slimpp_oid.domain.
+domain(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.domain.
 
 -spec name(Oid :: oid()) -> binary().
-name(Oid) when is_record(Oid, slimpp_oid) -> Oid#slimpp_oid.name.
+name(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.name.
 
 -spec topic(Oid :: oid()) -> binary().
-topic(#slimpp_oid{domain=Domain, class=Class, name=Name}) ->
+topic(#slim_oid{domain=Domain, class=Class, name=Name}) ->
     list_to_binary(["/domain/", Domain, "/", atom_to_list(Class), "/", Name]).
 
 

@@ -24,27 +24,27 @@
 
 -type oid_class() :: uid | vid | sid | gid | atom().
 
-%example: {slimpp_oid, <<"domain">>, uid, <<"name">>}
+%example: {slim_oid, <<"domain">>, uid, <<"name">>}
 %class: uid | vid | sid | gid
--record(slimpp_oid, {
+-record(slim_oid, {
 	domain	:: binary(),
 	class	:: oid_class(),
 	name	:: binary()
 }).
 
--type oid() :: #slimpp_oid{}.
+-type oid() :: #slim_oid{}.
 
-%example: {slimpp_content, <<"image">>, <<"base64">>, <<"aakkdka2rfka">>}
--record(slimpp_content, {
+%example: {slim_content, <<"image">>, <<"base64">>, <<"aakkdka2rfka">>}
+-record(slim_content, {
 	type		:: binary(),
 	encoding	:: binary(),
 	body		:: binary(),
 	style		:: binary()
 }).
 
--type content() :: #slimpp_content{}.
+-type content() :: #slim_content{}.
 
--record(slimpp_message, {
+-record(slim_message, {
 	from		:: oid(),
 	nick		:: binary(),
 	to			:: oid(),
@@ -53,9 +53,9 @@
 	content		:: content()
 }).
 
--type message() :: #slimpp_message{}.
+-type message() :: #slim_message{}.
 
--record(slimpp_presence, {
+-record(slim_presence, {
 	type	:: atom(),
 	from	:: oid(),
 	to		:: oid(),
@@ -64,7 +64,14 @@
 	status	:: binary()
 }).
 
--type presence() :: #slimpp_presence{}.
+-type presence() :: #slim_presence{}.
+
+-record(slim_ticket, {
+		class	:: atom(),
+		name	:: binary(),
+		token	:: binary()}).
+
+-type ticket() :: #slim_ticket{}.
 
 %name: <<"a/b/c">>
 %node: node()

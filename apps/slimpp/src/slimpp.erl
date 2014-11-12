@@ -1,4 +1,3 @@
-%%-----------------------------------------------------------------------------
 %% Copyright (c) 2014, Feng Lee <feng.lee@slimchat.io>
 %% 
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
