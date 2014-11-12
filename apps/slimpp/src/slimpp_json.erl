@@ -20,20 +20,16 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimpp).
+-module(slimpp_json).
 
-%% slimpp: slimpp library's entry point.
+-include("slimpp.hrl").
 
--export([my_func/0]).
+-export([encode/1,
+		 jsonify/1]).
 
-%% API
+encode(Packets) when is_list(Packets) ->
+	jsonify({data, Packets}).
 
-my_func() ->
-    ok().
-
-%% Internals
-
-ok() ->
-    ok.
-
-%% End of Module.
+jsonify(Term) ->
+    iolist_to_binary(mochijson2:encode(Term)).
+	
