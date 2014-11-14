@@ -20,6 +20,8 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
+%%TODO: FIXME Later
+
 -module(slim_router).
 
 -author('feng.lee@slimchat.io').
@@ -27,7 +29,6 @@
 -export([start_link/0, 
 		lookup/1, 
 		register/1, 
-		update/1,
 		unregister/1, 
         route/3]).
 
@@ -63,12 +64,11 @@
 start_link() -> 
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-
 %%
 %% @doc Lookup route with oid
 %%
 -spec lookup(Oid :: oid()) -> list(#slimrt_route{}).
-lookup(Oid) when is_record(Oid, nextalk_oid) ->
+lookup(Oid) when is_record(Oid, slim_oid) ->
 	mnesia:dirty_read({slimrt_route, Oid});
 
 %%
@@ -77,18 +77,72 @@ lookup(Oid) when is_record(Oid, nextalk_oid) ->
 lookup(Oids) when is_list(Oids) ->
 	lists:flatten([lookup(Oid) || Oid <- Oids]).
 
+%%
+%% @doc Register route.
+%%
+-spec register(Route :: #slim_route{}) -> ok.
+register(Route = #slim_route{oid=Oid, pid=Pid}) ->
+	slim_pubsub:subscribe(slim_oid:topic(Oid), Pid),
+	gen_server:call(?MODULE, {register, Route}).
+
+%%
+%% @doc Unregister route.
+%%
+-spec unregister(Oid :: oid()) -> any().
+unregister(Oid) when is_record(Oid, slim_oid) ->
+    Topic = slim_oid:topic(Oid),
+    lists:foreach(fun(Route = #slim_route{pid=Pid}) ->
+		slim_pubsub:unsubscribe(Topic, Pid),
+		gen_server:call(?MODULE, {unregister, Route})
+    end, lookup(Oid)).
+
+%%
+%% @doc route a packet.
+%%
+-spec route(From :: oid(), To :: oid(), Packet :: term()) -> any().
+route(_From, To, Packet) ->
+	slim_pubsub:publish(nextalk_oid:topic(To), Packet).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
 init(Args) ->
-    {ok, Args}.
+	process_flag(trap_exit, true),
+	mnesia:create_table(slim_route,
+		[{ram_copies, [node()]},
+		 {attributes, record_info(fields, slim_route)},
+		 {index, [mon]}]),
+	mnesia:add_table_copy(slim_route, node(), ram_copies),
+    {ok, state}.
 
 handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
+    Mon = erlang:monitor(process, Pid),
+    mnesia:dirty_write(Route#slim_route{mon = Mon}),
+    slim_meter:incr(route, nextalk_oid:domain(Oid)),
+    {reply, ok, State};
+
+handle_call({unregister, #slim_route{oid = Oid, mon = Mon}}, _From, State) ->
+	erlang:demonitor(Mon),
+	mnesia:dirty_delete({slim_route, Oid}),
+	slim_meter:decr(route, nextalk_oid:domain(Oid)),
+	folsom_metrics:notify('slim.routes', {dec, 1}),
+	{reply, ok, State};
+
+handle_call(Req, From, State) ->
+	{stop, {badreq, From, Req}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_info({'DOWN', Mon, _Type, _Object, _Info}, State) ->
+	Routes = mnesia:dirty_index_read(slim_route, Mon, #nextalk_route.mon),
+    [begin 
+        mnesia:dirty_delete(slim_route, Oid),
+        slim_meter:decr(route, nextalk_oid:domain(Oid)),
+		folsom_metrics:notify('slim.routes', {dec, 1})
+     end || #slim_route{oid = Oid} <- Routes],
+    {noreply, State};
 
 handle_info(_Info, State) ->
     {noreply, State}.
