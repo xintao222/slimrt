@@ -48,7 +48,7 @@ authorized(Req) ->
         {error, Error} -> {false, Error}
         end;
     Auth ->
-        {false, <<"Basic realm=\"nextalk.im\"">>}
+        {false, <<"Basic realm=\"", Domain, "\"">>}
     end.
 
 handle(Req, Opts) ->
@@ -61,63 +61,58 @@ handle(Req, Opts) ->
 		{ok, reply400(Req, <<"Bad Api Version">>)};
 	end.
 
-g(Key, Params) ->
-	proplists:get_value(Key, Params).
-
-g(Key, Params, Default) ->
-	proplists:get_value(Key, Params, Default).
 
 %TODO: write
 handle(Req, <<"POST">>, {<<"online">>}, Opts) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
-    Nick = g(nick, Params),
-    {Class, Name} = nextalk_id:parse(g(name, Params)),
-    Domain = g(domain, Params),
-    Rooms = g(rooms, Params, <<>>),
-    Buddies = g(buddies, Params, <<>>),
-    Show = g(show, Params, <<"available">>),
-    Status = g(status, Params, <<>>),
-    UserOid = nextalk_oid:make(Class, Domain, Name),
-    Rooms1 = [nextalk_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, $,)],
+    Nick = g(<<"nick">>, Params),
+    {Class, Name} = slim_id:parse(g(<<"name">>, Params)),
+    Domain = g(<<"domain">>, Params),
+    Rooms = g(<<"rooms">>, Params, <<>>),
+    Buddies = g(<<"buddies">>, Params, <<>>),
+    Show = g(<<"show">>, Params, <<"available">>),
+    Status = g<<"(status">>, Params, <<>>),
+    UserOid = slim_oid:make(Class, Domain, Name),
+    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, $,)],
     Buddies1 = lists:map(fun(Buddy) -> 
-		{Cls, Id} = nextalk_id:parse(Buddy),
-		nextalk_oid:make(Cls, Domain, Id)
+		{Cls, Id} = slim_id:parse(Buddy),
+		slim_oid:make(Cls, Domain, Id)
 	end, bsplit(Buddies, $,)),
     {ok, CPid} =
-    case nextalk_router:lookup(UserOid) of
+    case slim_router:lookup(UserOid) of
     [] ->
-        Client = #nextalk_endpoint{oid = UserOid, 
+        Client = #slim_endpoint{oid = UserOid, 
 							 	name = Name, 
 							 	nick = Nick, 
 							 	domain = Domain, 
 							 	show = b2a(Show),
 							 	status = Status},
-        nextalk_endpoint_sup:start_child({Client, Buddies1, Rooms1});
-    [Route = #nextalk_route{pid=Pid, show = OldShow}] ->
+        slim_endpoint_sup:start_child({Client, Buddies1, Rooms1});
+    [Route = #slim_route{pid=Pid, show = OldShow}] ->
 		%在线支持好友关系问题
-		nextalk_endpoint:update(Pid, {buddies, Buddies1}),
-		nextalk_endpoint:update(Pid, {rooms, Rooms1}),
+		slim_endpoint:update(Pid, {buddies, Buddies1}),
+		slim_endpoint:update(Pid, {rooms, Rooms1}),
         %TODO: should update rooms
         if
             Show == OldShow -> ignore;
-            true -> nextalk_router:update(Route#nextalk_route{show=Show})
+            true -> slim_router:update(Route#slim_route{show=Show})
         end,
-        {ok, Route#nextalk_route.pid}
+        {ok, Route#slim_route.pid}
     end,
-    Ticket = nextalk_ticket:make(UserOid#nextalk_oid.class, Name),
-    nextalk_endpoint:bind(CPid, Ticket),
+    Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
+    slim_endpoint:bind(CPid, Ticket),
 	%response
-	Presences = [ {nextalk_id:from(O), Sh} || #nextalk_route{oid = O, show = Sh} 
-					<- nextalk_router:lookup(Buddies1) ],
-	%Totals = [ {nextalk_oid:name(Room), length(nextalk_grpchat:members(Room))} || Room <- Rooms1 ],
+	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
+					<- slim_router:lookup(Buddies1) ],
+	%Totals = [ {slim_oid:name(Room), length(slim_grpchat:members(Room))} || Room <- Rooms1 ],
+	//TODO: FIX SERVER
 	Data = [{success, true},
-            {ticket, nextalk_ticket:encode(Ticket)},
-            {server, jsonpurl()}, 
-            {jsonpd, jsonpurl()},
-            {websocket, wsurl()}],
+            {ticket, slim_ticket:encode(Ticket)},
+            {server, [{jsonpd, slim_port:addr(jsonp)}, {websocket, slim_port:addr(wsocket)}]}
+		   ],
     Data1 = 
-    case nextalk:isopened(mqttd) of
-    true -> [{mqttd, mqtturl()} | Data];
+    case slimrt_port:isopened(mqttd) of
+    true -> [{mqttd, slim_port:addr(mqtt)} | Data];
     _ -> Data
     end,
     Data2 = 
@@ -129,25 +124,123 @@ handle(Req, <<"POST">>, {<<"online">>}, Opts) ->
 	{ok, reply200(Req, Data2), State};
 	{ok, Req};
 handle(Req, <<"POST">>, {<<"offline">>}, Opts) ->
-	{ok, Req};
+    Domain = g(<<"domain">>, Params),
+    Ticket = slim_ticket:make(g(<<"ticket">>, Params)),
+	UserOid = makeoid(Domain, Ticket),
+	case slim_router:lookup(UserOid) of
+	[Route] ->
+		slim_endpoint:unbind(Route#nextalk_route.pid, Ticket);
+	[] ->
+		?ERROR("~s alread offline...", [slim_oid:topic(UserOid)])
+	end,
+	{ok, replyok(Req)};
+
+%%TODO: fix 
 handle(Req, <<"GET">>, {<<"presences">>}, Opts) ->
-	{ok, Req};
+    Domain = g(domain, Params),
+	Ids = bsplit(g(ids, Params), $,),
+	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
+				  slim_oid:make(Cls, Domain, Id) 
+		    end || RawId <- Ids],
+	Response = [ {slim_id:from(O), Show} 
+				 || #slim_route{oid = O, show = Show} 
+				 <- slim_router:lookup(Oids) ],
+	{ok, reply200(Req, Response)};
+
 handle(Req, <<"POST">>, {<<"messages">>}, Opts) ->
-	{ok, Req};
+	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
+
+	%Domain
+    Domain = g(<<"domain">>, Params),
+	
+	//TODO:......
+
+	%FromOid
+	{Ticket, FromOid} =
+	case g(<<"ticket">>, Params) of
+	undefined -> %Push Message
+		{FromCls, From} = slim_id:parse(g(<<"from">>, Params)),
+		{undefined, slim_oid:make(FromCls, Domain, From)};
+	S -> %Send Message
+		T = slim_ticket:make(S),
+		{T, makeoid(Domain, T)}
+	end,
+
+	%ToOid
+	{ToCls, To} = slim_id:parse(g(<<"to">>, Params)),
+	Type = binary_to_atom(g(<<"type">>, Params, <<"chat">>)),
+	ToOid = 
+	case Type of
+	chat -> slim_oid:make(ToCls, Domain, To);
+	grpchat -> slim_oid:make(gid, Domain, To)
+	end,
+	
+	
+	Message = slim_message:make(FromOid, ToOid, Params),
+	case slim_router:lookup(UserOid) of
+	[#slim_route{pid=CPid}] ->
+		slim_endpoint:send(CPid, Ticket, ToOid, Message);
+	[] ->
+		%publish directly
+		slim_router:route(UserOid, ToOid, 
+			Message#slim_message{from=UserOid})
+	end,
+	{ok, replyok(Req1)};
 
 handle(Req, Method, Path, Opts) ->
 	{ok, reply400(Req, <<"Bad Request">>)};
 
 terminate(_Reason, _Req, _Opts) ->
 	ok.
-	
-qsfun(<<"GET">>) -> 
-	fun(Req) -> Vals = cowboy_req:parse_qs(Req), {ok, Vals, Req} end;
 
-qsfun(<<"POST">>) ->
-	fun(Req) -> cowboy_req:body_qs(Req) end.
+replyok(Req) ->
+	{ok, Reply} = cowboy_req:reply(200, [], jsonify_ok(), Req), 
+	Reply.
+
+reply200(Req, Term) ->
+	{ok, Reply} = cowboy_req:reply(200, [{"Content-Type", "text/plain"}], jsonify(Term), Req), 
+	Reply.
+	
+reply400(Req, Msg) ->
+	{ok, Reply} = cowboy_req:reply(400, [], jsonify_error(Msg), Req), 
+	Reply.
+
+reply401(Req, Msg) ->
+	{ok, Reply} = cowboy_req:reply(401, [], jsonify_error(Msg), Req), 
+	Reply.
+
+makeoid(Domain, #nextalk_ticket{class=Cls, name=Name}) ->
+	nextalk_oid:make(Cls, Domain, Name).
+
+%
+%onlines(Routes) -> onlines(Routes, []).
+%
+%onlines([], Acc) -> Acc;
+%
+%onlines([#nextalk_route{pid = Pid} | Routes], Acc) ->
+%    case catch nextalk_endpoint:info(Pid) of
+%    {ok, Client} -> onlines(Routes, [Client|Acc]);
+%    _ -> onlines(Routes, Acc)
+%    end.
+
+jsonify_ok() ->
+	jsonify([{status, ok}]).
+
+jsonify_error(Msg) when is_list(Msg) ->
+    jsonify_error(list_to_binary(Msg));
+
+jsonify_error(Msg) when is_binary(Msg) ->
+	jsonify([{status, error}, {message, Msg}]).
+
+g(Key, Params) ->
+	proplists:get_value(Key, Params).
+
+g(Key, Params, Default) ->
+	proplists:get_value(Key, Params, Default).
 
 tokens(Path) when is_binary(Path) ->
 	list_to_tuple(binary:split(Path, <<"/">>, [global])).
+
+
 
 

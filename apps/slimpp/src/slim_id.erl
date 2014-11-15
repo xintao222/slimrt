@@ -20,36 +20,24 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_port).
+-module(slim_id).
 
--author('feng.lee@slimchat.io').
+-export([parse/1,
+		 from/1]).
 
--export([open/3,
-		 addr/1]).
+parse(S) when is_binary(S) ->
+	case binary:split(S, [<<":">>]) of
+	[Cls, Id] -> {binary_to_atom(Cls), Id};
+	[Id] -> {uid, Id}
+	end.
 
-%SockOpts = [binary,
-%			{packet,    raw},
-%			{reuseaddr, true},
-%			{backlog,   128},
-%			{nodelay,   true}],
-open(Name, Module, Opts) ->
-    Listener = case ranch:start_listener(Name, 10, ranch_tcp, Opts, Module, []) of
-    {ok, Pid} -> Pid;
-    {error, {already_started, Pid}} -> Pid
-    end,
-	%?PRINT("Mqttd is listening on ~p~n", [proplists:get_value(port, Opts)]),
-	{ok, Listener}.
+from(#nextalk_oid{class=uid, name=Name}) ->
+	Name;
 
-isopened(Name) ->
-	true.
+from(#nextalk_oid{class=gid, name=Name}) ->
+	Name;
 
-%TODO:   
-addr(jsonp) ->
-	<<"http://localhost:8080/v1/packets">>;
+from(#nextalk_oid{class=Cls, name=Name}) ->
+	list_to_binary([atom_to_list(Cls), ":", Name]).
 
-addr(mqtt) ->
-	<<"tcp://localhost:8883">>;
-
-addr(wsocket) ->
-	<<"http://localhost:8080/v1/wsocket">>.  
 

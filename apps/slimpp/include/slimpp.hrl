@@ -34,23 +34,24 @@
 
 -type oid() :: #slim_oid{}.
 
+-type content_type() :: text | image | audio | video | file | atom().
 %example: {slim_content, <<"image">>, <<"base64">>, <<"aakkdka2rfka">>}
 -record(slim_content, {
-	type		:: binary(),
+	type		:: content_type(),
 	encoding	:: binary(),
-	body		:: binary(),
-	style		:: binary()
+	body		:: binary()
 }).
 
 -type content() :: #slim_content{}.
 
 -record(slim_message, {
+	id			:: binary(),
 	from		:: oid(),
 	nick		:: binary(),
 	to			:: oid(),
-	timestamp	:: float(),
+	ts			:: float(),
 	type = chat :: chat | grpchat,
-	content		:: content()
+	content		:: content() | binary()
 }).
 
 -type message() :: #slim_message{}.
@@ -65,6 +66,12 @@
 }).
 
 -type presence() :: #slim_presence{}.
+
+-record(slim_status, {
+		from	:: oid(),
+		nick	:: binary(),
+		to		:: oid(),
+		show	:: binary()}).
 
 -record(slim_ticket, {
 		class	:: atom(),

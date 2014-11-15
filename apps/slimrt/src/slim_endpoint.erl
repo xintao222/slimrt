@@ -116,7 +116,7 @@ unbind(CPid, Ticket)  ->
 %% @doc send a status, message or presence.
 %%
 -spec send(CPid :: pid(), Ticket :: ticket(), To :: oid(), 
-		Packet :: #slim_status{} | #nextalk_message{}) -> ok.
+		Packet :: #slim_status{} | #slim_message{}) -> ok.
 send(CPid, Ticket, To, Status) when is_record(Status, slim_status) ->
 	gen_server:cast(CPid, {status, Ticket, To, Status});
 
@@ -228,8 +228,7 @@ handle_call({bind, Ticket}, _From, #state{oid = Oid, ref = IdleTimer, subscriber
 	Ref = send_after(?IDLE_TIMEOUT, self(), {idle_timeout, Ticket}),
 	Sub = #slim_subscriber{ticket = Ticket, ref = Ref},
 	put(Ticket, Sub),
-    slim_meter:incr(bind, Oid#nextalk_oid.domain),
-	folsom_metrics:notify('nextalk.binds', {inc, 1}),
+    slim_meter:incr(bind, Oid#slim_oid.domain),
     {reply, ok, State#state{ref = undefined, subscribers = [Ticket|Subscribers]}};
 
 handle_call({unbind, Ticket}, _From, #state{oid = Oid, subscribers = Subscribers} = State) ->
@@ -262,8 +261,7 @@ handle_call({unbind, Ticket}, _From, #state{oid = Oid, subscribers = Subscribers
         ?WARNING("unbind ticket is not existed: ~p", [Ticket]),
 		State
 	end,
-	slim_meter:incr(unbind, Oid#nextalk_oid.domain),
-	folsom_metrics:notify('nextalk.unbinds', {inc, 1}),
+	slim_meter:incr(unbind, Oid#slim_oid.domain),
 	{reply, ok, NewState};
 
 
@@ -348,7 +346,7 @@ handle_cast({unsubscribe, Ticket, SPid}, State) ->
     case get(Ticket) of
     Sub when is_record(Sub, slim_subscriber)->
 		if
-		(Sub#slim_subscriber.spid == undefined) or (Sub#nextalk_subscriber.spid == SPid) ->
+		(Sub#slim_subscriber.spid == undefined) or (Sub#slim_subscriber.spid == SPid) ->
 			?INFO("unsubscribe ~p ~p", [Ticket, SPid]),
 			%TODO: FIX ME UNDEFINED
 			try_demonitor(Sub#slim_subscriber.mon),
@@ -367,12 +365,11 @@ handle_cast({unsubscribe, Ticket, SPid}, State) ->
 handle_cast({status, _Ticket, To, Status}, #state{oid = Oid} = State) ->
 	case slim_router:lookup(To) of
 	[_Route] ->
-		slim_router:route(Oid, To, Status#nextalk_status{from = Oid});
+		slim_router:route(Oid, To, Status#slim_status{from = Oid});
 	[] ->
 		ok
 	end,
-	slim_meter:incr(status, Oid#nextalk_oid.domain),
-	folsom_metrics:notify('nextalk.statuses.received', {inc, 1}),
+	slim_meter:incr(status, Oid#slim_oid.domain),
 	{noreply, State};
 
 handle_cast({message, FromTicket, To, Message}, #state{oid = Oid, 
@@ -411,15 +408,14 @@ handle_cast({message, FromTicket, To, Message}, #state{oid = Oid,
 	end, Subscribers),
 	%%------------------------------------------------------------------------------------
     %% Send Message 
-    %% slim_router:route -> nextalk_endpoint:dispatch =========
+    %% slim_router:route -> slim_endpoint:dispatch =========
     %%                                                     ||
     %%                                                     \/
-    %% ReceiverClient <---LongPoll---> slim_jsonp  <- nextalk_endpoint:handle_info(packet)
+    %% ReceiverClient <---LongPoll---> slim_jsonp  <- slim_endpoint:handle_info(packet)
 	%%------------------------------------------------------------------------------------
 	%% 
 	slim_router:route(Oid, To, Message1),
-	slim_meter:incr(message, Oid#nextalk_oid.domain),
-	folsom_metrics:notify('nextalk.messages.received', {inc, 1}),
+	slim_meter:incr(message, Oid#slim_oid.domain),
 	{noreply, State};
 
 handle_cast({presence, Presence = #slim_presence{type=Type, nick=Nick, show=Show, status=Status}}, 
@@ -434,7 +430,7 @@ handle_cast({presence, Presence = #slim_presence{type=Type, nick=Nick, show=Show
         Presence
     end,
 
-	[slim_router:route(Oid, Buddy#nextalk_roster.fid, Presence1)
+	[slim_router:route(Oid, Buddy#slim_roster.fid, Presence1)
         || Buddy <- slim_roster:buddies(Oid)],
 
 	if
@@ -444,7 +440,7 @@ handle_cast({presence, Presence = #slim_presence{type=Type, nick=Nick, show=Show
 		[#slim_route{show=Show}] -> %not changed
 			ignore;
 		[Route] -> %changed
-			slim_router:update(Route#nextalk_route{show=Show});
+			slim_router:update(Route#slim_route{show=Show});
 		[] ->
 			?ERROR("updating show: ~p, route not found: ~p", [Show, Oid])
 		end,
@@ -560,7 +556,7 @@ terminate(_Reason, #state{oid = Oid, client = Client, rooms = Rooms}) ->
 						 nick = Client#slim_endpoint.nick, 
 					     show = <<"unavailable">>, 
 						 status = Client#slim_endpoint.status},
-	[slim_router:route(Oid, Buddy#nextalk_roster.fid, Presence) || 
+	[slim_router:route(Oid, Buddy#slim_roster.fid, Presence) || 
 		Buddy <- slim_roster:buddies(Oid)],
 	slim_roster:remove(Oid),
 	slim_grpchat:leave(Oid, self()),
@@ -578,7 +574,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 dispatch(Packet, Subscribers) ->
     %% send Message to all the browsers of the receiver.
-    %% slim_endpoint:dispatch -> nextalk_endpoint:handle_info(packet)
+    %% slim_endpoint:dispatch -> slim_endpoint:handle_info(packet)
     %%                                              ||
     %%                                              ||
     %% ReceiverClient <---LongPoll---> slim_jsonp <--

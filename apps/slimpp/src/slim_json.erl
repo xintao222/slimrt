@@ -32,4 +32,5 @@ encode(Packets) when is_list(Packets) ->
 
 jsonify(Term) ->
     iolist_to_binary(mochijson2:encode(Term)).
-	
+
+

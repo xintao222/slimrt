@@ -23,8 +23,6 @@
 
 -include("slimrt.hrl").
 
--include_lib("elog/include/elog.hrl").
-
 -import(lists, [reverse/1]).
 
 -export([pack/1,
