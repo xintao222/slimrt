@@ -20,17 +20,19 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_json).
+-module(slim_oid_tests).
 
 -include("slimpp.hrl").
 
--export([encode/1,
-		 jsonify/1]).
+-ifdef(TEST).
 
-encode(Packets) when is_list(Packets) ->
-	jsonify({data, Packets}).
+-include_lib("eunit/include/eunit.hrl").
 
-jsonify(Term) ->
-    iolist_to_binary(mochijson2:encode(Term)).
+make_test() ->
+	?assertMatch(#slim_oid{domain = <<"localhost">>, class = uid, name = <<"123">>}, slim_oid:make(uid, <<"localhost">>, <<"123">>)).
 
+topic_test() ->
+	Oid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"123">>},
+	?assertEqual(<<"/domain/localhost/uid/123">>, slim_oid:topic(Oid)).
 
+-endif.

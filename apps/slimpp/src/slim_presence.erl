@@ -20,26 +20,43 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_id).
+-module(slim_presence).
 
 -include("slimpp.hrl").
 
--export([parse/1,
-		 from/1]).
+-import(slim_util, [g/2]).
 
-parse(S) when is_binary(S) ->
-	case binary:split(S, [<<":">>]) of
-	[Cls, Id] -> {binary_to_atom(Cls, utf8), Id};
-	[Id] -> {uid, Id}
+-export([make/3, to_list/1]).
+
+make(Type, FromOid, Params) when is_atom(Type) and is_record(FromOid, slim_oid) ->
+	Nick = proplists:get_value(<<"nick">>, Params),
+	Show = proplists:get_value(<<"show">>, Params),
+	Status = proplists:get_value(<<"status">>, Params),
+	#slim_presence {
+		type = Type, 
+		from = FromOid, 
+		nick = Nick, 
+		show = Show, 
+		status = Status
+	}.
+
+to_list(#slim_presence{
+	type = Type, 
+	from = FromOid, 
+	to = ToOid, 
+	nick = Nick, 
+	show = Show, 
+    status = Status}) -> 
+    List = [
+		{from, slim_id:from(FromOid)},
+		{nick, Nick},
+        {type, Type}, 
+		{show, Show}, 
+		{status, Status}],
+    if
+    is_record(ToOid, slim_oid) ->
+        [{to, slim_id:from(ToOid)} | List];
+    true ->
+        List
 	end.
-
-from(#slim_oid{class=uid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=gid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=Cls, name=Name}) ->
-	list_to_binary([atom_to_list(Cls), ":", Name]).
-
-
+	

@@ -20,26 +20,23 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_id).
+-module(slim_id_tests).
 
 -include("slimpp.hrl").
 
--export([parse/1,
-		 from/1]).
+-ifdef(TEST).
 
-parse(S) when is_binary(S) ->
-	case binary:split(S, [<<":">>]) of
-	[Cls, Id] -> {binary_to_atom(Cls, utf8), Id};
-	[Id] -> {uid, Id}
-	end.
+-include_lib("eunit/include/eunit.hrl").
 
-from(#slim_oid{class=uid, name=Name}) ->
-	Name;
+parse_test() ->
+	?assertEqual({uid, <<"1">>}, slim_id:parse(<<"1">>)),
+	?assertEqual({gid, <<"room1">>}, slim_id:parse(<<"gid:room1">>)).
 
-from(#slim_oid{class=gid, name=Name}) ->
-	Name;
+from_test() ->
+	?assertEqual(<<"123">>, slim_id:from(#slim_oid{class=uid, name = <<"123">>})),
+    ?assertEqual(<<"room1">>, slim_id:from(#slim_oid{class=gid, name = <<"room1">>})),
+	?assertEqual(<<"vid:1">>, slim_id:from(#slim_oid{class=vid, name = <<"1">>})).
 
-from(#slim_oid{class=Cls, name=Name}) ->
-	list_to_binary([atom_to_list(Cls), ":", Name]).
+-endif.
 
 

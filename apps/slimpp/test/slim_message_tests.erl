@@ -20,26 +20,13 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_id).
+-module(slim_message_tests).
 
 -include("slimpp.hrl").
 
--export([parse/1,
-		 from/1]).
+-ifdef(TEST).
 
-parse(S) when is_binary(S) ->
-	case binary:split(S, [<<":">>]) of
-	[Cls, Id] -> {binary_to_atom(Cls, utf8), Id};
-	[Id] -> {uid, Id}
-	end.
-
-from(#slim_oid{class=uid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=gid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=Cls, name=Name}) ->
-	list_to_binary([atom_to_list(Cls), ":", Name]).
+-include_lib("eunit/include/eunit.hrl").
 
 
+-endif.

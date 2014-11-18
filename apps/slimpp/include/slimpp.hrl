@@ -59,8 +59,8 @@
 -record(slim_presence, {
 	type	:: atom(),
 	from	:: oid(),
-	to		:: oid(),
 	nick	:: binary(),
+	to		:: oid(),
 	show	:: binary(),
 	status	:: binary()
 }).
@@ -79,6 +79,11 @@
 		token	:: binary()}).
 
 -type ticket() :: #slim_ticket{}.
+
+-record(slim_error, {
+	code	:: integer(),
+	reason	:: binary()
+}).
 
 %name: <<"a/b/c">>
 %node: node()

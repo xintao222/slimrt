@@ -150,18 +150,3 @@ include_wildcard(<<_H, T/binary>>) -> include_wildcard(T).
 
 l2b(L) when is_list(L) -> list_to_binary(L).
 
--ifdef(TEST).
-topic_test_() ->
-	true = validate({subscribe, <<"a/b/c">>}),
-	true = validate({subscribe, <<"/a/b">>}),
-	true = validate({subscribe, <<"/+/x">>}),
-	true = validate({subscribe, <<"/a/b/c/#">>}),
-	false = validate({subscribe, <<"a/#/c">>}),
-	true = match(<<"/a/b/c">>, <<"/a/b/c">>),
-	true = match(<<"/aa/bb/cc">>, <<"/aa/#">>),
-	true = match(<<"/aa/bb/cc">>, <<"/aa/+/cc">>),
-	io:format("triples: ~p~n", [triples(<<"/aa/bb/cc">>)]),
-	io:format("words: ~p~n", [words(<<"/x/y/zz/#">>)]),
-	ok.
--endif.
-

@@ -1,4 +1,3 @@
-%%-----------------------------------------------------------------------------
 %% Copyright (c) 2014, Feng Lee <feng.lee@slimchat.io>
 %% 
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,27 +18,27 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
-
--module(slim_id).
+-module(slim_status).
 
 -include("slimpp.hrl").
 
--export([parse/1,
-		 from/1]).
+-import(slim_util, [g/2]).
 
-parse(S) when is_binary(S) ->
-	case binary:split(S, [<<":">>]) of
-	[Cls, Id] -> {binary_to_atom(Cls, utf8), Id};
-	[Id] -> {uid, Id}
-	end.
+-export([make/3, to_list/1]).
 
-from(#slim_oid{class=uid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=gid, name=Name}) ->
-	Name;
-
-from(#slim_oid{class=Cls, name=Name}) ->
-	list_to_binary([atom_to_list(Cls), ":", Name]).
+make(FromOid, ToOid, Params) ->
+	Nick = proplists:get_value(<<"nick">>, Params),
+	Show = proplists:get_value(<<"show">>, Params),
+	#slim_status {
+		from	= FromOid, 
+		to		= ToOid,
+		nick 	= Nick,
+		show 	= Show }.
+		
+to_list(#slim_status{from = FromOid, to = ToOid, nick = Nick, show = Show}) ->	
+	[{from, slim_id:from(FromOid)},
+	 {to, slim_id:from(ToOid)},
+	 {nick, Nick},
+	 {show, Show}].
 
 
