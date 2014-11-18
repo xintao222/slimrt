@@ -68,7 +68,7 @@
 %% slim presence
 %%------------------------------------------------------------------------------
 -type presence_type() :: online | offline | show | subscribe | subscribed | unsubscribe | unsubscribed | hidden.
--type presence_show() :: available | unavailable | chatting | away | busy | hidden | atom().
+-type presence_show() :: available | unavailable | chat | away | busy | invisible | atom().
 
 -record(slim_presence, {
 	type	:: presence_type(),
