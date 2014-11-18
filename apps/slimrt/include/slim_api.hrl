@@ -20,13 +20,24 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_auth).
+-define(APIVSN, <<"v1">>).  
 
--author('feng.lee@slimchat.io').
+-define(SLIM_HTTP_APIS, [
+	<<"/presences/online">>,
+	<<"/presences/offline">>,
+	<<"/presences/show">>,
+	<<"/presences">>,
+	<<"/messages/send">>,
+	<<"/messages/push">>,
+	<<"/rooms/join">>,
+	<<"/rooms/leave">>,
+	<<"/rooms/memebers">>
+]).
+	
 
--export([check/2]).
+%jsonp long poll
+-define(SLIM_JSONP_API, <<"/packets">>).
 
-check(Domain, ApiKey) ->
-	true.
-
+%websocket long connect
+-define(SLIM_WSOCKET_API, <<"/wsocket">>).
 

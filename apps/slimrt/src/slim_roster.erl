@@ -22,7 +22,7 @@
 
 -module(slimrt_roster).
 
--include_lib("slimpp/include/slimrt.hrl").
+-include_lib("slimpp/include/slimpp.hrl").
 
 -include("slimrt.hrl").
 
@@ -87,7 +87,7 @@ init(_Args) ->
 		[{type, bag},
          {ram_copies, [node()]},
 		 {attributes, record_info(fields, slim_roster)}]),
-	mnesia:add_table_copy(nextalk_roster, node(), ram_copies),
+	mnesia:add_table_copy(slim_roster, node(), ram_copies),
     {ok, state}.
 
 handle_call(Req, _From, State) ->

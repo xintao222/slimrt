@@ -33,48 +33,48 @@ start_link() ->
 %%
 %% @doc Get members of a room
 %% 
--spec members(Gid :: oid()) -> list(#nextalk_room{}).
-members(Gid) when is_record(Gid, nextalk_oid) ->
-    mnesia:dirty_read(nextalk_room, Gid).
+-spec members(Gid :: oid()) -> list(#slim_room{}).
+members(Gid) when is_record(Gid, slim_oid) ->
+    mnesia:dirty_read(slim_room, Gid).
 
 %%
 %% @doc Get rooms of an endpoint
 %%
--spec rooms(Oid :: oid()) -> list(#nextalk_room{}).
-rooms(Oid) when is_record(Oid, nextalk_oid) ->
-    mnesia:dirty_index_read(nextalk_room, Oid, #nextalk_room.oid).
+-spec rooms(Oid :: oid()) -> list(#slim_room{}).
+rooms(Oid) when is_record(Oid, slim_oid) ->
+    mnesia:dirty_index_read(slim_room, Oid, #slim_room.oid).
 
 %%
 %% @doc An endpoint join a room.
 %%
 -spec join(Gid :: oid(), Oid :: oid(), Pid :: pid(), Nick :: binary()) -> any().
-join(Gid, Oid, Pid, Nick) when is_record(Gid, nextalk_oid) ->
+join(Gid, Oid, Pid, Nick) when is_record(Gid, slim_oid) ->
 	join([Gid], Oid, Pid, Nick);
 
 join(Gids, Oid, Pid, Nick) when is_list(Gids) ->
     %old gids 
-    %OldGids = [  Id || #nextalk_room{gid = Id} <- mnesia:dirty_index_read(nextalk_room, Oid, #nextalk_room.oid) ],
+    %OldGids = [  Id || #slim_room{gid = Id} <- mnesia:dirty_index_read(slim_room, Oid, #slim_room.oid) ],
 
 	%write into db
-	Room = fun(Gid) -> #nextalk_room{gid=Gid, oid=Oid, nick=Nick} end,
+	Room = fun(Gid) -> #slim_room{gid=Gid, oid=Oid, nick=Nick} end,
 	mnesia:sync_dirty(fun() -> [mnesia:write(Room(Gid)) || Gid <- Gids] end),
 
     %broadcast 'join' presence to new joined rooms
     %JoinedGids = Gids -- OldGids,
     %Presence = fun(Gid) -> 
-    %    #nextalk_presence{
+    %    #slim_presence{
     %        type = join,
     %        to = Gid,
     %        from = Oid,
     %        nick = Nick,
     %        show = <<"available">>,
-    %        status = nextalk_oid:name(Gid)
+    %        status = slim_oid:name(Gid)
     %    }
     %end,
-    %[nextalk_router:route(Oid, Gid, Presence(Gid)) || Gid <- JoinedGids], 
+    %[slim_router:route(Oid, Gid, Presence(Gid)) || Gid <- JoinedGids], 
 
 	%subscribe to router
-	[ nextalk_pubsub:subscribe(nextalk_oid:topic(Gid), Pid) || Gid <- Gids ].
+	[ slim_pubsub:subscribe(slim_oid:topic(Gid), Pid) || Gid <- Gids ].
 
 %%
 %% @doc An endpoint leave a room.
@@ -82,25 +82,25 @@ join(Gids, Oid, Pid, Nick) when is_list(Gids) ->
 -spec leave(Gid :: oid(), Oid :: oid(), Pid :: pid()) -> any().
 leave(Gid, Oid, Pid) ->
 	%unsubscribe
-	nextalk_pubsub:unsubscribe(nextalk_oid:topic(Gid), Pid),
+	slim_pubsub:unsubscribe(slim_oid:topic(Gid), Pid),
     %read rooms
-    Rooms = [ G || G = #nextalk_room{oid = Oid1}
-			<- mnesia:dirty_read({nextalk_room, Gid}), Oid == Oid1],
+    Rooms = [ G || G = #slim_room{oid = Oid1}
+			<- mnesia:dirty_read({slim_room, Gid}), Oid == Oid1],
 	%remove from db
 	mnesia:sync_dirty(fun() ->
 		[ mnesia:delete_object(G) || G <- Rooms ]
 	end).
     %broadcast 'leave' presences, TODO: need to test
-    %Presence = fun(#nextalk_room{gid = Gid1, nick = Nick}) -> 
-	%    #nextalk_presence{
+    %Presence = fun(#slim_room{gid = Gid1, nick = Nick}) -> 
+	%    #slim_presence{
     %        type = leave,
     %        to   = Gid1,
     %        from = Oid,
     %        nick = Nick,
     %        show = <<"available">>,
-    %        status = nextalk_oid:name(Gid1)}
+    %        status = slim_oid:name(Gid1)}
     %end,
-    %[nextalk_router:route(Oid, Gid, Presence(Room)) || Room <- Rooms].
+    %[slim_router:route(Oid, Gid, Presence(Room)) || Room <- Rooms].
 
 %%
 %% @doc An endpoint leave all rooms
@@ -108,30 +108,30 @@ leave(Gid, Oid, Pid) ->
 -spec leave(Oid :: oid(), Pid :: pid()) -> any().
 leave(Oid, Pid) ->
 	%unsubscribe
-	Rooms = mnesia:dirty_index_read(nextalk_room, Oid, #nextalk_room.oid),
-	[ nextalk_pubsub:unsubscribe(nextalk_oid:topic(Gid), Pid) || #nextalk_room{ gid = Gid } <- Rooms ],
+	Rooms = mnesia:dirty_index_read(slim_room, Oid, #slim_room.oid),
+	[ slim_pubsub:unsubscribe(slim_oid:topic(Gid), Pid) || #slim_room{ gid = Gid } <- Rooms ],
 	%remove from db
 	mnesia:sync_dirty(fun() -> [ mnesia:delete_object(G) || G <- Rooms ] end).
     %broadcast 'leave' presence, TODO: need to test
-    %Presence = fun(#nextalk_room{gid = Gid, nick = Nick}) -> 
-	%    #nextalk_presence{
+    %Presence = fun(#slim_room{gid = Gid, nick = Nick}) -> 
+	%    #slim_presence{
     %        type = leave,
     %        to   = Gid,
     %        from = Oid,
     %        nick = Nick,
     %        show = <<"available">>,
-    %        status = nextalk_oid:name(Gid)}
+    %        status = slim_oid:name(Gid)}
     %end,
-    %[nextalk_router:route(Oid, Gid, Presence(Room)) || Room = #nextalk_room{gid=Gid} <- Rooms].
+    %[slim_router:route(Oid, Gid, Presence(Room)) || Room = #slim_room{gid=Gid} <- Rooms].
 
 
 init([]) ->
-    mnesia:create_table(nextalk_room,
+    mnesia:create_table(slim_room,
         [{ram_copies, [node()]},
          {type, bag},
          {index, [oid]},
-         {attributes, record_info(fields, nextalk_room)}]),
-    mnesia:add_table_copy(nextalk_room, node(), ram_copies),
+         {attributes, record_info(fields, slim_room)}]),
+    mnesia:add_table_copy(slim_room, node(), ram_copies),
     {ok, state}.
 
 handle_call(Req, _From, State) ->

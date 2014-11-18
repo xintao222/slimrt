@@ -69,7 +69,7 @@ start_link() ->
 %%
 -spec lookup(Oid :: oid()) -> list(#slimrt_route{}).
 lookup(Oid) when is_record(Oid, slim_oid) ->
-	mnesia:dirty_read({slimrt_route, Oid});
+	mnesia:dirty_read({slim_route, Oid});
 
 %%
 %% @doc Lookup routes with oids
@@ -101,7 +101,7 @@ unregister(Oid) when is_record(Oid, slim_oid) ->
 %%
 -spec route(From :: oid(), To :: oid(), Packet :: term()) -> any().
 route(_From, To, Packet) ->
-	slim_pubsub:publish(nextalk_oid:topic(To), Packet).
+	slim_pubsub:publish(slim_oid:topic(To), Packet).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -116,36 +116,34 @@ init(Args) ->
 	mnesia:add_table_copy(slim_route, node(), ram_copies),
     {ok, state}.
 
-handle_call(_Request, _From, State) ->
+handle_call({register, #slim_route{oid = Oid, pid = Pid}}, _From, State) ->
     Mon = erlang:monitor(process, Pid),
     mnesia:dirty_write(Route#slim_route{mon = Mon}),
-    slim_meter:incr(route, nextalk_oid:domain(Oid)),
+    slim_meter:incr(route, slim_oid:domain(Oid)),
     {reply, ok, State};
 
 handle_call({unregister, #slim_route{oid = Oid, mon = Mon}}, _From, State) ->
 	erlang:demonitor(Mon),
 	mnesia:dirty_delete({slim_route, Oid}),
-	slim_meter:decr(route, nextalk_oid:domain(Oid)),
-	folsom_metrics:notify('slim.routes', {dec, 1}),
+	slim_meter:decr(route, slim_oid:domain(Oid)),
 	{reply, ok, State};
 
 handle_call(Req, From, State) ->
 	{stop, {badreq, From, Req}, State}.
 
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+handle_cast(Msg, State) ->
+    {stop, {badmsg, Msg}, State}.
 
 handle_info({'DOWN', Mon, _Type, _Object, _Info}, State) ->
-	Routes = mnesia:dirty_index_read(slim_route, Mon, #nextalk_route.mon),
+	Routes = mnesia:dirty_index_read(slim_route, Mon, #slim_route.mon),
     [begin 
         mnesia:dirty_delete(slim_route, Oid),
-        slim_meter:decr(route, nextalk_oid:domain(Oid)),
-		folsom_metrics:notify('slim.routes', {dec, 1})
+        slim_meter:decr(route, slim_oid:domain(Oid))
      end || #slim_route{oid = Oid} <- Routes],
     {noreply, State};
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info(Info, State) ->
+    {stop, {badinfo, Info}, State}.
 
 terminate(_Reason, _State) ->
     ok.

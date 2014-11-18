@@ -81,13 +81,13 @@ handle(Req, <<"POST">>, {<<"online">>}, Opts) ->
     {ok, CPid} =
     case slim_router:lookup(UserOid) of
     [] ->
-        Client = #slim_endpoint{oid = UserOid, 
+        Endpoint = #slim_endpoint{oid = UserOid, 
 							 	name = Name, 
 							 	nick = Nick, 
 							 	domain = Domain, 
-							 	show = b2a(Show),
+							 	show = binary_to_atom(Show),
 							 	status = Status},
-        slim_endpoint_sup:start_child({Client, Buddies1, Rooms1});
+        slim_endpoint_sup:start_child({Endpoint, Buddies1, Rooms1});
     [Route = #slim_route{pid=Pid, show = OldShow}] ->
 		%在线支持好友关系问题
 		slim_endpoint:update(Pid, {buddies, Buddies1}),
@@ -129,7 +129,7 @@ handle(Req, <<"POST">>, {<<"offline">>}, Opts) ->
 	UserOid = makeoid(Domain, Ticket),
 	case slim_router:lookup(UserOid) of
 	[Route] ->
-		slim_endpoint:unbind(Route#nextalk_route.pid, Ticket);
+		slim_endpoint:unbind(Route#slim_route.pid, Ticket);
 	[] ->
 		?ERROR("~s alread offline...", [slim_oid:topic(UserOid)])
 	end,
@@ -138,7 +138,7 @@ handle(Req, <<"POST">>, {<<"offline">>}, Opts) ->
 %%TODO: fix 
 handle(Req, <<"GET">>, {<<"presences">>}, Opts) ->
     Domain = g(domain, Params),
-	Ids = bsplit(g(ids, Params), $,),
+	Ids = binary:split(g(ids, Params), [<<",">>], [global]),
 	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
 				  slim_oid:make(Cls, Domain, Id) 
 		    end || RawId <- Ids],
@@ -152,7 +152,7 @@ handle(Req, <<"POST">>, {<<"messages">>}, Opts) ->
 
 	%Domain
     Domain = g(<<"domain">>, Params),
-	
+
 	//TODO:......
 
 	%FromOid
@@ -167,23 +167,24 @@ handle(Req, <<"POST">>, {<<"messages">>}, Opts) ->
 	end,
 
 	%ToOid
-	{ToCls, To} = slim_id:parse(g(<<"to">>, Params)),
 	Type = binary_to_atom(g(<<"type">>, Params, <<"chat">>)),
+	{ToCls, To} = slim_id:parse(g(<<"to">>, Params)),
 	ToOid = 
 	case Type of
-	chat -> slim_oid:make(ToCls, Domain, To);
-	grpchat -> slim_oid:make(gid, Domain, To)
+	chat -> 
+		slim_oid:make(ToCls, Domain, To);
+	grpchat -> 
+		slim_oid:make(gid, Domain, To)
 	end,
 	
-	
-	Message = slim_message:make(FromOid, ToOid, Params),
+	Message = slim_message:make(Type, FromOid, ToOid, Params),
 	case slim_router:lookup(UserOid) of
 	[#slim_route{pid=CPid}] ->
+		%send message
 		slim_endpoint:send(CPid, Ticket, ToOid, Message);
 	[] ->
 		%publish directly
-		slim_router:route(UserOid, ToOid, 
-			Message#slim_message{from=UserOid})
+		slim_router:route(UserOid, ToOid, Message)
 	end,
 	{ok, replyok(Req1)};
 
@@ -209,19 +210,8 @@ reply401(Req, Msg) ->
 	{ok, Reply} = cowboy_req:reply(401, [], jsonify_error(Msg), Req), 
 	Reply.
 
-makeoid(Domain, #nextalk_ticket{class=Cls, name=Name}) ->
-	nextalk_oid:make(Cls, Domain, Name).
-
-%
-%onlines(Routes) -> onlines(Routes, []).
-%
-%onlines([], Acc) -> Acc;
-%
-%onlines([#nextalk_route{pid = Pid} | Routes], Acc) ->
-%    case catch nextalk_endpoint:info(Pid) of
-%    {ok, Client} -> onlines(Routes, [Client|Acc]);
-%    _ -> onlines(Routes, Acc)
-%    end.
+makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
+	slim_oid:make(Cls, Domain, Name).
 
 jsonify_ok() ->
 	jsonify([{status, ok}]).
