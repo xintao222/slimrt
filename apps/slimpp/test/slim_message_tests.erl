@@ -28,5 +28,27 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+make_test() ->
+	Message = new_message(),
+	?debugFmt("~p", [Message]),
+	?assertMatch(#slim_message{subject = <<"Hello">>}, Message).
+
+new_message() ->
+	FromOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid1">>},
+	ToOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid2">>},
+	Params = [
+		{<<"id">>, <<"13288371">>},
+		{<<"chatid">>, <<"183838">>},
+		{<<"nick">>, <<"User1">>},
+		{<<"subject">>, <<"Hello">>},
+		{<<"body">>, <<"Hello world">>},
+		{<<"ts">>, <<"1923837771">>}
+	],
+	slim_message:make(chat, FromOid, ToOid, Params).
+	
+list_test() ->
+	List = slim_message:list(new_message()),
+	?assertEqual(<<"Hello">>, proplists:get_value(subject, List)),
+	?assertEqual(1923837771, proplists:get_value(ts, List)).
 
 -endif.

@@ -24,39 +24,23 @@
 
 -include("slimpp.hrl").
 
--import(slim_util, [g/2]).
-
--export([make/3, to_list/1]).
+-export([make/3, list/1]).
 
 make(Type, FromOid, Params) when is_atom(Type) and is_record(FromOid, slim_oid) ->
-	Nick = proplists:get_value(<<"nick">>, Params),
-	Show = proplists:get_value(<<"show">>, Params),
-	Status = proplists:get_value(<<"status">>, Params),
-	#slim_presence {
-		type = Type, 
-		from = FromOid, 
-		nick = Nick, 
-		show = Show, 
-		status = Status
-	}.
+	Presence = #slim_presence{type = Type, from = FromOid},
+	make(Params, Presence).
 
-to_list(#slim_presence{
-	type = Type, 
-	from = FromOid, 
-	to = ToOid, 
-	nick = Nick, 
-	show = Show, 
-    status = Status}) -> 
-    List = [
-		{from, slim_id:from(FromOid)},
-		{nick, Nick},
-        {type, Type}, 
-		{show, Show}, 
-		{status, Status}],
-    if
-    is_record(ToOid, slim_oid) ->
-        [{to, slim_id:from(ToOid)} | List];
-    true ->
-        List
-	end.
+make([], Presence) ->
+	Presence;
+make([{<<"nick">>, Nick} | Params], Presence) ->
+	make(Params, Presence#slim_presence{nick = Nick});
+make([{<<"show">>, Show} | Params], Presence) ->
+	make(Params, Presence#slim_presence{show = binary_to_atom(Show, utf8)});
+make([{<<"status">>, Status} | Params], Presence) ->
+	make(Params, Presence#slim_presence{status = Status});
+make([_ | Params], Presence) ->
+	make(Params, Presence).
 	
+list(Presence) when is_record(Presence, slim_presence) ->
+	[{K, V} || {K, V} <- ?record_to_list(slim_presence, Presence), V =/= undefined].
+

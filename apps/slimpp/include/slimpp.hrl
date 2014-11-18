@@ -22,10 +22,14 @@
 
 -define(COPYRIGHT, "Copyright (c) 2014 SlimChat.IO"). 
 
+-define(record_to_list(Tag, Val), lists:zip(record_info(fields, Tag), tl(tuple_to_list(Val)))).
+
+%%------------------------------------------------------------------------------
+% slim oid
+%%------------------------------------------------------------------------------
 -type oid_class() :: uid | vid | sid | gid | atom().
 
 %example: {slim_oid, <<"domain">>, uid, <<"name">>}
-%class: uid | vid | sid | gid
 -record(slim_oid, {
 	domain	:: binary(),
 	class	:: oid_class(),
@@ -34,57 +38,73 @@
 
 -type oid() :: #slim_oid{}.
 
--type content_type() :: text | image | audio | video | file | atom().
-%example: {slim_content, <<"image">>, <<"base64">>, <<"aakkdka2rfka">>}
--record(slim_content, {
-	type		:: content_type(),
-	encoding	:: binary(),
-	body		:: binary()
-}).
+%%------------------------------------------------------------------------------
+%% slim message
+%%------------------------------------------------------------------------------
+-type message_type() :: chat | grpchat | event | atom().
 
--type content() :: #slim_content{}.
+-type message_format() :: text | image | audio | video | file | atom().
 
 -record(slim_message, {
-	id			:: binary(),
-	from		:: oid(),
-	nick		:: binary(),
-	to			:: oid(),
-	ts			:: float(),
-	type = chat :: chat | grpchat,
-	content		:: content() | binary()
+	%% message properties
+	id			:: binary(), 		% message unique id
+	chatid		:: binary(), 		% conversation id
+	type		:: message_type(),  % content type 
+	from		:: oid(), 	 		% send from
+	nick		:: binary(), 		% sender nickname
+	to			:: oid(),	 		% send to
+	%% message content
+	format		:: message_format(),% content format
+	encoding	:: binary(),		% content encoding
+	subject		:: binary(), 		% content subject/topic
+	body		:: binary(),		% content body
+	%% timestamp
+	ts			:: integer()			%message timstamp
 }).
 
 -type message() :: #slim_message{}.
 
+%%------------------------------------------------------------------------------
+%% slim presence
+%%------------------------------------------------------------------------------
+-type presence_type() :: online | offline | show | subscribe | subscribed | unsubscribe | unsubscribed | hidden.
+-type presence_show() :: available | unavailable | chatting | away | busy | hidden | atom().
+
 -record(slim_presence, {
-	type	:: atom(),
+	type	:: presence_type(),
 	from	:: oid(),
 	nick	:: binary(),
-	to		:: oid(),
-	show	:: binary(),
-	status	:: binary()
+	to		:: oid(),		%% optional
+	priority:: integer(),   %not used
+	show	:: presence_show(),
+	status	:: binary(),
+	ts		:: integer()
 }).
 
 -type presence() :: #slim_presence{}.
 
--record(slim_status, {
-		from	:: oid(),
-		nick	:: binary(),
-		to		:: oid(),
-		show	:: binary()}).
-
+%%------------------------------------------------------------------------------
+%% slim ticket
+%%------------------------------------------------------------------------------
 -record(slim_ticket, {
-		class	:: atom(),
-		name	:: binary(),
-		token	:: binary()}).
+	class	:: atom(),
+	name	:: binary(),
+	token	:: binary()
+}).
 
 -type ticket() :: #slim_ticket{}.
 
+%%------------------------------------------------------------------------------
+%% slim error
+%%------------------------------------------------------------------------------
 -record(slim_error, {
 	code	:: integer(),
 	reason	:: binary()
 }).
 
+%%------------------------------------------------------------------------------
+%% pubsub topic
+%%------------------------------------------------------------------------------
 %name: <<"a/b/c">>
 %node: node()
 %words: [<<"a">>, <<"b">>, <<"c">>]

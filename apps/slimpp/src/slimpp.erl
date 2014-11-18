@@ -21,56 +21,7 @@
 
 -module(slimpp).
 
--include("slimpp.hrl").
-
--export([encode/1,
-		 validate/1,
-		 jsonify/1]).
-
--import(lists, [reverse/1]).
-
 %% API
-encode(#slim_error{code = Code, reason = Reason}) ->
-	jsonify([{error, [{code, Code}, {reason, Reason}]}]);	
-
-encode(Packets) when is_list(Packets) and ( length(Packets) > 0 ) ->
-	DataMap = encode(Packets, #{messages => [], presences => [], statuses => []}),
-	Data = [{K, V} || {K, V} <- maps:to_list(DataMap), V =/= []],
-	jsonify([{data, Data}]).
-
-encode([], AccMap = #{messages := MsgAcc, presences := PresAcc, statuses := StatusAcc}) ->
-	AccMap#{messages := reverse(MsgAcc), 
-			presences := reverse(PresAcc), 
-			statuses := reverse(StatusAcc)
-	};
-
-encode([Msg|T], AccMap = #{messages := MsgAcc}) when is_record(Msg, slim_message) ->
-	encode(T, AccMap#{messages := [slim_message:to_list(Msg)|MsgAcc]});
-
-encode([Pres|T], AccMap = #{presences := PresAcc}) when is_record(Pres, slim_presence) ->
-	encode(T, AccMap#{presences := [slim_presence:to_list(Pres)|PresAcc]});
-
-encode([Status|T], AccMap = #{statuses := StatusAcc}) when is_record(Status, slim_status) ->
-	encode(T, AccMap#{statuses := [slim_status:to_list(Status)|StatusAcc]}).
-	
-validate(Msg = #slim_message{from = undefined}) ->
-	throw({badpkt, Msg});
-validate(Msg = #slim_message{to = undefined}) ->
-	throw({badpkt, Msg});
-validate(Msg) when is_record(Msg, slim_message) ->
-	true;
-validate(Presence = #slim_presence{from = undefined}) ->
-	throw({badpkt, Presence});
-validate(Presence) when is_record(Presence, slim_presence) ->
-	true;
-validate(Status = #slim_status{from = undefined}) ->
-	throw({badpkt, Status});
-validate(Status = #slim_status{to = undefined}) ->
-	throw({badpkt, Status});
-validate(Status) when is_record(Status, slim_status) ->
-	true.
-	
-jsonify(Term) ->
-    iolist_to_binary(mochijson2:encode(Term)).
 
 %% End of Module.
+

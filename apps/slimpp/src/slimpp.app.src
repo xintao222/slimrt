@@ -4,8 +4,14 @@
   {vsn, git},
   {modules, [
              slimpp,
-			 slimpp_oid,
-			 slimpp_topic
+			 slim_id,
+			 slim_json,
+			 slim_message,
+			 slim_oid,
+			 slim_packet,
+			 slim_presence,
+			 slim_ticket,
+			 slim_topic
             ]},
   {registered, []},
   {applications, [

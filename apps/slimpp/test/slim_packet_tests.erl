@@ -20,7 +20,7 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimpp_tests).
+-module(slim_packet_tests).
 
 -include("slimpp.hrl").
 
@@ -30,8 +30,7 @@
 
 encode_test() ->
 	Err = #slim_error{code = 404, reason = <<"Not Found.">>},
-	Json = slimpp:encode(Err),
+	Json = slim_packet:encode(Err),
 	?debugMsg(Json).
-
 
 -endif.

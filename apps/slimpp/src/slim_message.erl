@@ -24,59 +24,36 @@
 
 -include("slimpp.hrl").
 
--export([make/4, to_list/1]).
-
--import(slim_util, [g/2, g/3]).
+-export([make/4, list/1]).
 
 -spec make(Type :: atom(), FromOid :: oid(), ToOid :: oid(), Params :: [tuple()]) -> message().
-make(Type, FromOid, ToOid, Params) ->
-	Id = proplists:get_value(<<"id">>, Params),
-	Nick = proplists:get_value(<<"nick">>, Params, <<>>),
-	Body = proplists:get_value(<<"body">>, Params),
-	Ts = proplists:get_value(<<"ts">>, Params),
-	ContentType = proplists:get_value(<<"content_type">>, Params, <<"text">>),
-	ContentEncoding = proplists:get_value(<<"content_encoding">>, Params),
-	Content = #slim_content{
-		type = binary_to_atom(ContentType, utf8), 
-		encoding = ContentEncoding, 
-		body = Body
-	},
-	#slim_message {
-		id			= Id,
-		type 		= Type,
-		from		= FromOid,
-		nick		= Nick,
-		to			= ToOid,
-		ts			= Ts, 
-		content		= Content
-	}.
+make(Type, FromOid, ToOid, Params) when is_atom(Type) and is_record(FromOid, slim_oid) 
+	and is_record(ToOid, slim_oid) ->
+	Message = #slim_message{type = Type, from = FromOid, to = ToOid},
+	make(Params, Message).
 
--spec to_list(Message :: message()) -> [ term() ].
-to_list(#slim_message {
-	id			= Id,
-	from		= FromOid,
-	nick		= Nick,
-	to			= ToOid,
-	ts			= Ts, 
-	type 		= Type,
-	content		= Content}) ->
-	[{id, Id},
-	 {type, Type},
-	 {from, slim_id:from(FromOid)},
-	 {nick, Nick},
-	 {to, slim_id:from(ToOid)},
-	 {ts, Ts},
-	 {content, to_list(Content)}];
+make([], Message) ->
+	Message;
+make([{<<"id">>, Id} | Params], Message) ->
+	make(Params, Message#slim_message{id = Id});
+make([{<<"chatid">>, ChatId} | Params], Message) ->
+	make(Params, Message#slim_message{chatid = ChatId});
+make([{<<"nick">>, Nick} | Params], Message) ->
+	make(Params, Message#slim_message{nick = Nick});
+make([{<<"format">>, Format} | Params], Message) ->
+	make(Params, Message#slim_message{format = binary_to_atom(Format, utf8)});
+make([{<<"encoding">>, Encoding} | Params], Message) ->
+	make(Params, Message#slim_message{encoding = Encoding});
+make([{<<"subject">>, Subject} | Params], Message) ->
+	make(Params, Message#slim_message{subject = Subject});
+make([{<<"body">>, Body} | Params], Message) ->
+	make(Params, Message#slim_message{body = Body});
+make([{<<"ts">>, Ts} | Params], Message) ->
+	make(Params, Message#slim_message{ts = binary_to_integer(Ts)});
+make([_ | Params], Message) ->
+	make(Params, Message).
 
-to_list(#slim_content{
-		type = text, 
-		body = Body
-	}) ->
-	Body;
-
-to_list(#slim_content{type = Type, encoding = undefined, body = Body}) ->
-	[{type, Type}, {body, Body}];
-to_list(#slim_content{type = Type, encoding = Encoding, body = Body}) ->
-	[{type, Type}, {encoding, Encoding}, {body, Body}].
-
+-spec list(Message :: message()) -> [ tuple() ].
+list(Message) when is_record(Message, slim_message) ->
+	[{K, V} || {K, V} <- ?record_to_list(slim_message, Message), V =/= undefined].
 

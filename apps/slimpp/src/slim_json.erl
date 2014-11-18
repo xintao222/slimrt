@@ -18,27 +18,13 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
--module(slim_status).
 
--include("slimpp.hrl").
+-module(slim_json).
 
--import(slim_util, [g/2]).
+-export([encode/1]).
 
--export([make/3, to_list/1]).
+%% API
+encode(Term) -> 
+    iolist_to_binary(mochijson2:encode(Term)).
 
-make(FromOid, ToOid, Params) ->
-	Nick = proplists:get_value(<<"nick">>, Params),
-	Show = proplists:get_value(<<"show">>, Params),
-	#slim_status {
-		from	= FromOid, 
-		to		= ToOid,
-		nick 	= Nick,
-		show 	= Show }.
-		
-to_list(#slim_status{from = FromOid, to = ToOid, nick = Nick, show = Show}) ->	
-	[{from, slim_id:from(FromOid)},
-	 {to, slim_id:from(ToOid)},
-	 {nick, Nick},
-	 {show, Show}].
-
-
+%% End of Module.
