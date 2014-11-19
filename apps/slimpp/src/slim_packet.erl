@@ -28,10 +28,10 @@
 
 -import(lists, [reverse/1]).
 
-encode(Packets) when is_list(Packets) and length(Packets) > 0  ->
+encode(Packets) when is_list(Packets) and (length(Packets) > 0)  ->
 	DataMap = encode(Packets, #{messages => [], presences => []}),
 	Data = [{K, V} || {K, V} <- maps:to_list(DataMap), V =/= []],
-	jsonify([{data, Data}]);
+    jsonify([{data, Data}]);
 
 encode(#slim_error{code = Code, reason = Reason}) ->
 	jsonify([{error, [{code, Code}, {reason, Reason}]}]).

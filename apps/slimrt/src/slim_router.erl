@@ -29,6 +29,7 @@
 -export([start_link/0, 
 		lookup/1, 
 		register/1, 
+        update/1,
 		unregister/1, 
         route/3]).
 
@@ -84,6 +85,20 @@ lookup(Oids) when is_list(Oids) ->
 register(Route = #slim_route{oid=Oid, pid=Pid}) ->
 	slim_pubsub:subscribe(slim_oid:topic(Oid), Pid),
 	gen_server:call(?MODULE, {register, Route}).
+
+%%
+%% @doc update presence show.
+%%
+-spec update({Oid :: oid(), Show :: atom()) -> ok.
+update({Oid, Show}) when is_record(Oid, slim_oid) ->
+    mnesia:sync_dirty(fun() -> 
+        case mnesia:read(slim_route, Oid, write) of
+        [Route] ->
+            mnesia:write(Route#slim_route{show = Show});
+        [] ->
+            ignore    
+        end
+    end).
 
 %%
 %% @doc Unregister route.

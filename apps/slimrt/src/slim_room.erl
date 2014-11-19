@@ -1,4 +1,4 @@
--module(slimrt_grpchat).
+-module(slim_room).
 
 -author('feng.lee@slimchat.io').
 

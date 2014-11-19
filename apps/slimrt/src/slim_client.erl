@@ -20,46 +20,16 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slim_packet_tests).
+-module(slim_client).
 
--include("slimpp.hrl").
+-author('feng.lee@slimchat.io').
 
--ifdef(TEST).
+-export([online/2, offline/2]).
 
--include_lib("eunit/include/eunit.hrl").
+online(Oid, Params) ->
+    ok.
 
-encode_packets_test() ->
-    Json1 = slim_packet:encode([new_presence()]),
-    ?debugFmt("~p~n", [Json1]),
+offline(Oid, Params) ->
+    ok.
 
-    Json2 = slim_packet:encode([new_message(), new_presence()]),
-    ?debugFmt("~p~n", [Json2]).
 
-encode_error_test() ->
-	Err = #slim_error{code = 404, reason = <<"Not Found.">>},
-	Json = slim_packet:encode(Err),
-	?debugMsg(Json).
-
-new_message() ->
-	FromOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid1">>},
-	ToOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid2">>},
-	Params = [
-		{<<"id">>, <<"13288371">>},
-		{<<"chatid">>, <<"183838">>},
-		{<<"nick">>, <<"User1">>},
-		{<<"subject">>, <<"Hello">>},
-		{<<"body">>, <<"Hello world">>},
-		{<<"ts">>, <<"1923837771">>}
-	],
-	slim_message:make(chat, FromOid, ToOid, Params).
-
-new_presence() ->
-    FromOid = #slim_oid{domain = <<"localhost">>, class = vid, name = <<"v1291">>},
-    Params = [
-        {<<"nick">>, <<"V1291">>},
-        {<<"show">>, <<"available">>},
-        {<<"status">>, <<"#">>}
-    ],
-    slim_presence:make(online, FromOid, Params).
-
--endif.

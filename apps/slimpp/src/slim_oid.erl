@@ -47,7 +47,7 @@ make(Class, Domain, Name) when is_atom(Class) and is_binary(Domain) and is_binar
     #slim_oid{domain = Domain, class = Class, name = Name}.
 
 -spec class(Oid :: oid()) -> atom().
-class(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.class.
+class(Oid) when ?is_oid(Oid) -> Oid#slim_oid.class.
 
 -spec domain(Oid :: oid()) -> binary().
 domain(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.domain.
