@@ -24,15 +24,12 @@
 
 -author('feng.lee@slimchat.io').
 
--include("slimpp.hrl").
+-include("slim_api.hrl").
 
 -export([init/2,
 		 websocket_handle/3,
 		 websocket_info/3,
 		 websocket_terminate/3]).
-
-%Websocket long connect
--define(WSOCKET, "/wsocket").
 
 init(Req, Opts) ->
 	{cowboy_websocket, Req, Opts, hibernate}.

@@ -27,13 +27,81 @@
 -export([online/2, offline/2]).
 
 online(Oid, Params) ->
+    Nick = g(<<"nick">>, Params),
+    {Class, Name} = slim_id:parse(g(<<"name">>, Params)),
+    Domain = g(<<"domain">>, Params),
+    Rooms = g(<<"rooms">>, Params, <<>>),
+    Buddies = g(<<"buddies">>, Params, <<>>),
+    Show = g(<<"show">>, Params, <<"available">>),
+    Status = g<<"(status">>, Params, <<>>),
+    UserOid = slim_oid:make(Class, Domain, Name),
+    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, $,)],
+    Buddies1 = lists:map(fun(Buddy) -> 
+		{Cls, Id} = slim_id:parse(Buddy),
+		slim_oid:make(Cls, Domain, Id)
+	end, bsplit(Buddies, $,)),
+    {ok, CPid} =
+    case slim_router:lookup(UserOid) of
+    [] ->
+        Endpoint = #slim_endpoint{oid = UserOid, 
+							 	name = Name, 
+							 	nick = Nick, 
+							 	domain = Domain, 
+							 	show = binary_to_atom(Show),
+							 	status = Status},
+        slim_endpoint_sup:start_child({Endpoint, Buddies1, Rooms1});
+    [Route = #slim_route{pid=Pid, show = OldShow}] ->
+		%在线支持好友关系问题
+		slim_endpoint:update(Pid, {buddies, Buddies1}),
+		slim_endpoint:update(Pid, {rooms, Rooms1}),
+        %TODO: should update rooms
+        if
+            Show == OldShow -> ignore;
+            true -> slim_router:update(Route#slim_route{show=Show})
+        end,
+        {ok, Route#slim_route.pid}
+    end,
+    Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
+    slim_endpoint:bind(CPid, Ticket),
+	%response
+	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
+					<- slim_router:lookup(Buddies1) ],
+	%Totals = [ {slim_oid:name(Room), length(slim_grpchat:members(Room))} || Room <- Rooms1 ],
+	//TODO: FIX SERVER
+	Data = [{success, true},
+            {ticket, slim_ticket:encode(Ticket)},
+            {server, [{jsonpd, slim_port:addr(jsonp)}, {websocket, slim_port:addr(wsocket)}]}
+		   ],
+    Data1 = 
+    case slimrt_port:isopened(mqttd) of
+    true -> [{mqttd, slim_port:addr(mqtt)} | Data];
+    _ -> Data
+    end,
+    Data2 = 
+    case Presences of
+    [] -> [{presences, {}}|Data1];
+    _ -> [{presences, Presences}|Data1]
+    end,
+	?INFO("Response: ~p", [Data2]),
+	{ok, reply200(Req, Data2), State};
     ok.
 
-offline(Oid, Params) ->
-    ok.
+offline(Ticket, Params) ->
+	case slim_climgr:lookup(Ticket) of
+	undefined ->
+		?ERROR("~s is alread offline...", [Ticket]);
+	Pid ->
+		slim_endpoint:unbind(Pid, Ticket)
+	end.
 
-get_presences(Params) ->
-    ok.
+get_presences(Domain, Params) ->
+	Ids = binary:split(get_value(ids, Params), [<<",">>], [global]),
+	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
+				  slim_oid:make(Cls, Domain, Id) 
+		    end || RawId <- Ids],
+	[ {slim_id:from(O), Show} 
+		|| #slim_route{oid = O, show = Show} 
+		<- slim_router:lookup(Oids) ].
 
 set_presence(Params) ->
     ok.

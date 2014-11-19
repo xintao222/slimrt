@@ -26,6 +26,8 @@
 
 -include_lib("slimpp/include/slimpp.hrl").
 
+-import(proplists, [get_value/2, get_value/3]).
+
 -export([init/2,
 		 terminate/3]).  
 
@@ -55,99 +57,41 @@ handle(Req, Opts) ->
 	Method = cowboy_req:method(Req),
 	Path = cowboy_req:path(Req),
 	case Path of 
-	<<"/", ?APIVSN, "/", ApiPath/binary>> ->
-		handle(Req, Method, tokens(ApiPath), Opts).
+	<<"/", ?APIVSN, ApiPath/binary>> ->
+		handle(Req, Method, ApiPath, Opts).
 	_ ->
-		{ok, reply400(Req, <<"Bad Api Version">>)};
+		{ok, reply400(Req, <<"Bad Api Path">>)};
 	end.
 
-
-%TODO: write
-handle(Req, <<"POST">>, {<<"online">>}, Opts) ->
+handle(Req, <<"POST">>, <<"/presences/online">>, Opts) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
-    Nick = g(<<"nick">>, Params),
-    {Class, Name} = slim_id:parse(g(<<"name">>, Params)),
-    Domain = g(<<"domain">>, Params),
-    Rooms = g(<<"rooms">>, Params, <<>>),
-    Buddies = g(<<"buddies">>, Params, <<>>),
-    Show = g(<<"show">>, Params, <<"available">>),
-    Status = g<<"(status">>, Params, <<>>),
+    Domain = get_value(<<"domain">>, Params),
+    {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
     UserOid = slim_oid:make(Class, Domain, Name),
-    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, $,)],
-    Buddies1 = lists:map(fun(Buddy) -> 
-		{Cls, Id} = slim_id:parse(Buddy),
-		slim_oid:make(Cls, Domain, Id)
-	end, bsplit(Buddies, $,)),
-    {ok, CPid} =
-    case slim_router:lookup(UserOid) of
-    [] ->
-        Endpoint = #slim_endpoint{oid = UserOid, 
-							 	name = Name, 
-							 	nick = Nick, 
-							 	domain = Domain, 
-							 	show = binary_to_atom(Show),
-							 	status = Status},
-        slim_endpoint_sup:start_child({Endpoint, Buddies1, Rooms1});
-    [Route = #slim_route{pid=Pid, show = OldShow}] ->
-		%在线支持好友关系问题
-		slim_endpoint:update(Pid, {buddies, Buddies1}),
-		slim_endpoint:update(Pid, {rooms, Rooms1}),
-        %TODO: should update rooms
-        if
-            Show == OldShow -> ignore;
-            true -> slim_router:update(Route#slim_route{show=Show})
-        end,
-        {ok, Route#slim_route.pid}
-    end,
-    Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
-    slim_endpoint:bind(CPid, Ticket),
-	%response
-	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
-					<- slim_router:lookup(Buddies1) ],
-	%Totals = [ {slim_oid:name(Room), length(slim_grpchat:members(Room))} || Room <- Rooms1 ],
-	//TODO: FIX SERVER
-	Data = [{success, true},
-            {ticket, slim_ticket:encode(Ticket)},
-            {server, [{jsonpd, slim_port:addr(jsonp)}, {websocket, slim_port:addr(wsocket)}]}
-		   ],
-    Data1 = 
-    case slimrt_port:isopened(mqttd) of
-    true -> [{mqttd, slim_port:addr(mqtt)} | Data];
-    _ -> Data
-    end,
-    Data2 = 
-    case Presences of
-    [] -> [{presences, {}}|Data1];
-    _ -> [{presences, Presences}|Data1]
-    end,
-	?INFO("Response: ~p", [Data2]),
-	{ok, reply200(Req, Data2), State};
+	%FIXME
+	case slim_client:online(UserOid,  Params) of
+	{ok, Data} -> 
+		{ok, reply(Req1, 200, Data)};
+	{error, Code, Reason} ->
+		{ok, reply(Req1, Code, Reason)}
+	end;
+
+handle(Req, <<"POST">>, <<"/presences/offline">>, Opts) ->
+	{ok, Params, Req1} = cowboy_req:body_qs(Req),
+    Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+	slim_client:offline(Ticket, Params);
+	{ok, reply(Req1, 200, [{status, ok}]}.
+
+handle(Req, <<"POST">>, <<"/presences/show">>, Opts) ->
 	{ok, Req};
-handle(Req, <<"POST">>, {<<"offline">>}, Opts) ->
-    Domain = g(<<"domain">>, Params),
-    Ticket = slim_ticket:make(g(<<"ticket">>, Params)),
-	UserOid = makeoid(Domain, Ticket),
-	case slim_router:lookup(UserOid) of
-	[Route] ->
-		slim_endpoint:unbind(Route#slim_route.pid, Ticket);
-	[] ->
-		?ERROR("~s alread offline...", [slim_oid:topic(UserOid)])
-	end,
-	{ok, replyok(Req)};
 
-%%TODO: fix 
-handle(Req, <<"GET">>, {<<"presences">>}, Opts) ->
+handle(Req, <<"GET">>, <<"/presences">>, Opts) ->
     Domain = g(domain, Params),
-	Ids = binary:split(g(ids, Params), [<<",">>], [global]),
-	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
-				  slim_oid:make(Cls, Domain, Id) 
-		    end || RawId <- Ids],
-	Response = [ {slim_id:from(O), Show} 
-				 || #slim_route{oid = O, show = Show} 
-				 <- slim_router:lookup(Oids) ],
-	{ok, reply200(Req, Response)};
+	Presences = slim_client:get_presences(Domain, Params),
+	{ok, reply(Req, 200, [{data, Presences}])};
+	
 
-handle(Req, <<"POST">>, {<<"messages">>}, Opts) ->
+handle(Req, <<"POST">>, <<"/messages/send">>, Opts) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
 
 	%Domain
@@ -188,6 +132,16 @@ handle(Req, <<"POST">>, {<<"messages">>}, Opts) ->
 	end,
 	{ok, replyok(Req1)};
 
+handle(Req, <<"POST">>, <<"/messages/push">>, Opts) ->
+	{ok, Req};
+
+handle(Req, <<"POST">>, <<"/rooms/join">>, Opts) ->
+	{ok, Req};
+handle(Req, <<"POST">>, <<"/rooms/leave">>, Opts) ->
+	{ok, Req};
+handle(Req, <<"POST">>, <<"/rooms/members">>, Opts) ->
+	{ok, Req};
+
 handle(Req, Method, Path, Opts) ->
 	{ok, reply400(Req, <<"Bad Request">>)};
 
@@ -222,15 +176,7 @@ jsonify_error(Msg) when is_list(Msg) ->
 jsonify_error(Msg) when is_binary(Msg) ->
 	jsonify([{status, error}, {message, Msg}]).
 
-g(Key, Params) ->
-	proplists:get_value(Key, Params).
-
-g(Key, Params, Default) ->
-	proplists:get_value(Key, Params, Default).
-
 tokens(Path) when is_binary(Path) ->
 	list_to_tuple(binary:split(Path, <<"/">>, [global])).
-
-
 
 

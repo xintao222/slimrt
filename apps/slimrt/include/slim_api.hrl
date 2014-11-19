@@ -20,18 +20,19 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--define(APIVSN, <<"v1">>).  
+-define(APIVSN, "v1").  
 
+%%TODO: FIXME Later
 -define(SLIM_HTTP_APIS, [
-	<<"/presences/online">>,
-	<<"/presences/offline">>,
-	<<"/presences/show">>,
-	<<"/presences">>,
-	<<"/messages/send">>,
-	<<"/messages/push">>,
-	<<"/rooms/join">>,
-	<<"/rooms/leave">>,
-	<<"/rooms/memebers">>
+	"/presences/online",
+	"/presences/offline",
+	"/presences/show",
+	"/presences",
+	"/messages/send",
+	"/messages/push",
+	"/rooms/join",
+	"/rooms/leave",
+	"/rooms/memebers"
 ]).
 	
 
@@ -40,4 +41,5 @@
 
 %websocket long connect
 -define(SLIM_WSOCKET_API, <<"/wsocket">>).
+
 

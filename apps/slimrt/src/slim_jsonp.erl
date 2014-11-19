@@ -1,3 +1,4 @@
+%%%----------------------------------------------------------------------
 %% Copyright (c) 2014, Feng Lee <feng.lee@slimchat.io>
 %% 
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,140 +22,82 @@
 
 -module(slim_jsonp).
 
+-author('feng.lee@slimchat.io').
+
 -include("slimrt.hrl").
 
 -import(lists, [reverse/1]).
 
--export([pack/1,
-		valid/1,
-		encode/1,
-		jsonify/1]).
+-behaviour(cowboy_loop_handler).
+ 
+-export([init/3, 
+		info/3, 
+		terminate/3]).
 
-%TODO: Refactor Later
-pack(Packets) ->
-    pack(Packets, [], [], []).
+-record(state, {callback = <<>>, ticket, endpoint}).
 
-pack([], MsgAcc, PresAcc, StatAcc) ->
-    jsonify([{status, <<"ok">>}, 
-			 {messages, reverse(MsgAcc)}, 
-			 {presences, reverse(PresAcc)}, 
-			 {statuses, reverse(StatAcc)}]);
+init({tcp, http}, Req, _Opts) ->
+	{Params, Req1} = cowboy_req:qs_vals(Req),
+	?INFO("Jsonp request: ~p", [Params]),
+    Domain = g(<<"domain">>, Params),
+    Callback = g(<<"callback">>, Params, <<>>), 
+    Ticket = #nextalk_ticket{class=Class, name=Name} = 
+		nextalk_ticket:make(g(<<"ticket">>, Params)),
+	Oid = nextalk_oid:make(Class, Domain, Name),
+	case nextalk_router:lookup(Oid) of
+	[Route] ->
+		Endpoint = Route#nextalk_route.pid,
+		State = #state{callback = Callback, ticket = Ticket, endpoint = Endpoint},
+		nextalk_endpoint:subscribe(poll, Endpoint, Ticket, self()),
+		{loop, Req1, State, ?POLL_TIMEOUT, hibernate};
+	[] ->
+        ?ERROR("ticket '~p' not found", [Ticket]),
+		JSON = jsonify([{status, "stopped"}, {message, "error: Client not Found!"}]),
+		{ok, Reply} = cowboy_req:reply(404, [], JSON, Req),
+		{shutdown, Reply, #state{}}
+	end.
 
-pack([Message = #slim_message{from=FromOid, nick=Nick, to=ToOid, timestamp=Timestamp, 
-    type=Type ,body=Body, style=Style} | T], MsgAcc, PresAcc, StatusAcc) ->
-	valid(Message),
-    MsgObj = [{from, slim_id:from(FromOid)},
-              {to, slim_id:from(ToOid)},
-			  {nick, Nick}, 
-			  {timestamp, Timestamp}, 
-              {type, Type},
-			  {body, Body},
-			  {style, Style}],
-    pack(T, [MsgObj|MsgAcc], PresAcc, StatusAcc);
+info({ok, Packets}, Req, State = #state{callback=CB}) ->
+	JSON = nextalk_json:pack(lists:reverse(Packets)),
+	Reply =	replyok(CB, JSON, Req),
+    {ok, Reply, State};
+ 
+info(stop, Req, State = #state{callback=CB}) ->
+	JSON = "{\"status\": \"stopped\"}",
+	Reply = replyok(CB, JSON, Req),
+    {ok, Reply, State};
 
-pack([Presence = #slim_presence{type=Type, from=FromOid, to=ToOid, nick=Nick, show=Show, 
-    status=Status} | T], MsgAcc, PresAcc, StatusAcc) ->
-	valid(Presence),
-    PresObj = [{from, slim_id:from(FromOid)},
-			   {nick, Nick},
-               {type, Type}, 
-			   {show, Show}, 
-			   {status, Status}],
-    PresObj1 = 
-    if
-    is_record(ToOid, slim_oid) ->
-        [{to, slim_id:from(ToOid)}|PresObj];
-    true ->
-        PresObj
-    end,
-    pack(T, MsgAcc, [PresObj1|PresAcc], StatusAcc);
+info(Message, Req, State) ->
+	?ERROR("badmsg: ~p", [Message]),
+    {loop, Req, State, hibernate}.
 
-pack([Status = #slim_status{from= FromOid, to=ToOid, nick = Nick, show=Show} | T], 
-    MsgAcc, PresAcc, StatusAcc) ->
-	valid(Status),
-    StatusObj = [{from, slim_id:from(FromOid)},
-				 {nick, Nick},
-                 {to, slim_id:from(ToOid)},
-				 {show, Show}],
-    pack(T, MsgAcc, PresAcc, [StatusObj|StatusAcc]).
+timeout(Req, State = #state{callback=CB}) ->
+	JSON = nextalk_json:pack([]),
+	Reply =	replyok(CB, JSON, Req),
+	{ok, Reply, State}.
+ 
+terminate(_Reason, _Req, #state{ticket = Ticket, endpoint = Pid}) ->
+	unsubscribe(Pid, Ticket),
+	ok.
 
-encode(Msg) when is_record(Msg, slim_message) ->
-	valid(Msg),
-	jsonify(jsonobj(Msg));
+replyok(<<>>, JSON, Req) ->
+	Headers = [{"Content-Type", "application/json"}],
+	{ok, Reply} = cowboy_req:reply(200, Headers, JSON, Req),
+    Reply;
 
-encode(Presence) when is_record(Presence, slim_presence) ->
-	valid(Presence),
-	jsonify(jsonobj(Presence));
+replyok(CB, JSON, Req) ->
+	Headers = [{"Content-Type", "application/javascript"}],
+    JS = list_to_binary([CB, "(", JSON, ")"]),
+	{ok, Reply} = cowboy_req:reply(200, Headers, JS, Req),
+	Reply.
 
-encode(Status) when is_record(Status, slim_status) ->
-	valid(Status),
-	jsonify(jsonobj(Status));
-
-encode(L) when is_list(L) ->
-	jsonify([jsonobj(E) || E <- L]).
-
-valid(Msg = #slim_message{from=undefined}) ->
-	throw({badpkt, Msg});
-valid(Msg = #slim_message{to=undefined}) ->
-	throw({badpkt, Msg});
-valid(Msg) when is_record(Msg, slim_message) ->
-	true;
-
-valid(Presence = #slim_presence{from=undefined}) ->
-	throw({badpkt, Presence});
-valid(Presence) when is_record(Presence, slim_presence) ->
-	true;
-
-valid(Status = #slim_status{from=undefined}) ->
-	throw({badpkt, Status});
-valid(Status = #slim_status{to=undefined}) ->
-	throw({badpkt, Status});
-valid(Status) when is_record(Status, slim_status) ->
-	true.
-
-jsonobj(#slim_message{from=FromOid, 
-						nick=Nick, 
-						to=ToOid, 
-						timestamp=Timestamp, 
-						type=Type,
-						body=Body, 
-						style=Style}) ->
-    [{message, [{from, slim_id:from(FromOid)}, 
-				{nick, Nick}, 
-				{to, slim_id:from(ToOid)}, 
-				{timestamp, Timestamp}, 
-				{type, Type}, 
-				{body, Body}, 
-				{style, Style} ]}];
-
-jsonobj(#slim_presence{type=Type,
-                        to=ToOid,
-						from=FromOid,
-						nick=Nick,
-						show=Show,
-						status=Status}) ->
-    Data = [{from, slim_id:from(FromOid)},
-            {nick, Nick},
-            {type, Type},
-            {show, Show},
-            {status, Status}],
-    Data1 = 
-    if
-    ToOid == undefined -> Data;
-    true -> [{to, slim_id:from(ToOid)}|Data]
-    end,
-	[{presence, Data1}];
-
-jsonobj(#slim_status{ from= FromOid,
-						to=ToOid,
-						nick = Nick,
-						show=Show}) ->
-    [{status, [{from, slim_id:from(FromOid)},
-			   {nick, Nick},
-			   {to, slim_id:from(ToOid)},
-			   {show, Show}]}].
-
-jsonify(Term) ->
-    iolist_to_binary(mochijson2:encode(Term)).
-
+unsubscribe(undefined, _) ->
+	ingore;
+unsubscribe(Pid, Ticket)  ->
+	case is_process_alive(Pid) of
+	true ->
+		nextalk_endpoint:unsubscribe(Pid, Ticket, self());
+	false ->
+		ignore
+	end.
 

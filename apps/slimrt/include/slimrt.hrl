@@ -25,10 +25,10 @@
 -define(POLL_TIMEOUT, 27000).
 
 %%------------------------------------------------------------------------------
-%% Subscriber
+%% Client
 %%------------------------------------------------------------------------------
-%each subscriber has a ticket :)
--record(slim_subscriber, {
+%each client has a ticket :)
+-record(slim_client, {
     ticket		:: ticket(),
     spid		:: pid(),
     ref			:: reference(),
@@ -36,6 +36,10 @@
     type		:: atom(),
     packets=[]	:: list()
 }).
+
+-type client() :: #slim_client{}.
+
+-define(is_client(Record), is_record(Client, slim_client)).
 
 %%------------------------------------------------------------------------------
 %% Endpoint
@@ -48,6 +52,10 @@
     show = available	:: presence_show()
 }).
 
+-type endpoint() :: #slim_endpoint{}.
+
+-define(is_endpoint(Record), is_record(Record, slim_endpoint)).
+
 %%------------------------------------------------------------------------------
 %% Roster
 %%------------------------------------------------------------------------------
@@ -56,14 +64,22 @@
     fid		:: oid()
 }).
 
+-type roster() :: #slim_roster{}.
+
+-define(is_roster(Record), is_record(Record, slim_roster)).
+
 %%------------------------------------------------------------------------------
-%% Room
+%% Room, FIXME Later
 %%------------------------------------------------------------------------------
 -record(slim_room, {
 	gid		:: oid(), %room oid
 	oid		:: oid(), % member oid
 	nick	:: binary()
 }).
+
+-type room() :: #slim_room().
+
+-define(is_room(Record), is_record(Record, slim_room)).
 
 %%------------------------------------------------------------------------------
 %% Route
@@ -74,5 +90,9 @@
 	mon		:: reference(),
 	show	:: presence_show()
 }).
+
+-type route() :: #slim_route{}.
+
+-define(is_route(Record), is_record(Record, slim_route)).
 
 
