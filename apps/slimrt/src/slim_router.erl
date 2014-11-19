@@ -20,18 +20,9 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
-%%TODO: FIXME Later
-
 -module(slim_router).
 
 -author('feng.lee@slimchat.io').
-
--export([start_link/0, 
-		lookup/1, 
-		register/1, 
-        update/1,
-		unregister/1, 
-        route/3]).
 
 -behaviour(gen_server).
 
@@ -41,7 +32,12 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).
+-export([start_link/0, 
+		lookup/1, 
+		register/1, 
+        update/1,
+		unregister/1, 
+        route/3]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports

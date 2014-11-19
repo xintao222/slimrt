@@ -32,4 +32,25 @@ online(Oid, Params) ->
 offline(Oid, Params) ->
     ok.
 
+get_presences(Params) ->
+    ok.
+
+set_presence(Params) ->
+    ok.
+
+send_message() ->
+    ok.
+
+push_message() ->
+    ok.
+
+join_room() ->
+    ok.
+
+leave_room() ->
+    ok.
+
+room_members() ->
+    ok.
+
 
