@@ -57,88 +57,69 @@ authorized(Req) ->
 
 handle(Req, _Opts) ->
 	Method = cowboy_req:method(Req),
-	Path = cowboy_req:path(Req),
-	case Path of 
-	<<"/", ?APIVSN, ApiPath/binary>> ->
-		handle(Req, Method, ApiPath);
+	case cowboy_req:path(Req) of
+	<<"/", ?APIVSN, Path/binary>> ->
+		handle(Req, Method, Path);
 	_ ->
-		{ok, reply400(Req, <<"Bad Api Path">>)}
+		{ok, reply400(Req, <<"Bad Path">>)}
 	end.
 
-handle(Req, <<"POST">>, <<"/presences/online">>) ->
+handle(Req, <<"POST">>, <<"/clients/online">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Domain = get_value(<<"domain">>, Params),
     {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
-    UserOid = slim_oid:make(Class, Domain, Name),
-	%FIXME
-	case slim_client:online(UserOid,  Params) of
+    FromOid = slim_oid:make(Class, Domain, Name),
+	case slim_client:online(FromOid,  Params) of
 	{ok, Data} -> 
-		{ok, reply(Req1, 200, Data)};
+		reply(ok, Req1, 200, Data);
 	{error, Code, Reason} ->
-		{ok, reply(Req1, Code, Reason)}
+		reply(ok, Req1, Code, Reason)
 	end;
 
-handle(Req, <<"POST">>, <<"/presences/offline">>) ->
+handle(Req, <<"POST">>, <<"/clients/offline">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	slim_client:offline(Ticket, Params),
-	{ok, reply(Req1, 200, [{status, ok}])};
+	reply(ok, Req1, 200);
 
-handle(Req, <<"POST">>, <<"/presences/show">>) ->
+handle(Req, <<"POST">>, <<"/presences/set">>) ->
+	%TODO: ....
 	{ok, Req};
 
 handle(Req, <<"GET">>, <<"/presences">>) ->
 	{ok, Params} = cowboy_req:qs_vals(Req),
     Domain = get_value(<<"domain">>, Params),
-	Presences = slim_client:get_presences(Domain, Params),
-	{ok, reply(Req, 200, [{data, Presences}])};
+	Ids = binary:split(get_value(ids, Params), [<<",">>], [global]),
+	Presences = slim_client:get_presences(Domain, Ids),
+	reply(ok, Req, 200, Presences);
 
 handle(Req, <<"POST">>, <<"/messages/send">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
-	%Domain
-    Domain = get_value(<<"domain">>, Params),
-	%%TODO:......
-
-	%FromOid
-	{Ticket, FromOid} =
-	case get_value(<<"ticket">>, Params) of
-	undefined -> %Push Message
-		{FromCls, From} = slim_id:parse(get_value(<<"from">>, Params)),
-		{undefined, slim_oid:make(FromCls, Domain, From)};
-	S -> %Send Message
-		T = slim_ticket:make(S),
-		{T, makeoid(Domain, T)}
-	end,
-
-	%ToOid
-	Type = binary_to_atom(get_value(<<"type">>, Params, <<"chat">>), utf8),
-	{ToCls, To} = slim_id:parse(get_value(<<"to">>, Params)),
-	ToOid = 
-	case Type of
-	chat -> 
-		slim_oid:make(ToCls, Domain, To);
-	grpchat -> 
-		slim_oid:make(gid, Domain, To)
-	end,
-	
-	Message = slim_message:make(Type, FromOid, ToOid, Params),
-	case slim_router:lookup(FromOid) of
-	[#slim_route{pid=CPid}] ->
-		%send message
-		slim_endpoint:send(CPid, Ticket, ToOid, Message);
-	[] ->
-		%publish directly
-		slim_router:route(FromOid, ToOid, Message)
-	end,
-	{ok, replyok(Req1)};
+	Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+	case slim_client:send_message(Ticket, Params) of
+	ok ->
+		reply(ok, Req, 200);
+	{error, Reason} ->
+		reply(error, Req, 500, Reason)
+	end.
 
 handle(Req, <<"POST">>, <<"/messages/push">>) ->
-	{ok, Req};
+	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
+	Domain = get_value(<<"domain">>, Params),
+	{FromCls, From} = slim_id:parse(get_value(<<"from">>, Params)),
+	FromOid = #slim_oid{FromCls, Domain, From},
+	case slim_client:push_message(FromOid, Params) of
+	ok ->
+		reply(ok, Req, 200);
+	{error, Reason} ->
+		reply(error, Req, 500, Reason)
+	end.
 
 handle(Req, <<"POST">>, <<"/rooms/join">>) ->
 	{ok, Req};
 handle(Req, <<"POST">>, <<"/rooms/leave">>) ->
 	{ok, Req};
+
 handle(Req, <<"POST">>, <<"/rooms/members">>) ->
 	{ok, Req};
 
@@ -148,40 +129,21 @@ handle(Req, _Method, _Path) ->
 terminate(_Reason, _Req, _Opts) ->
 	ok.
 
-replyok(Req) ->
-	{ok, Reply} = cowboy_req:reply(200, [], jsonify_ok(), Req), 
-	Reply.
-
-reply200(Req, Term) ->
-	Json = slim_json:encode(Term),
-	{ok, Reply} = cowboy_req:reply(200, [{"Content-Type", "text/plain"}], Json, Req), 
+reply(ok, Req, Code) ->
+	Json = slim_json:encode([{status, ok}]),
+	{ok, Reply} = cowboy_req:reply(Code, [], Json, Req), 
 	Reply.
 	
-reply400(Req, Msg) ->
-	{ok, Reply} = cowboy_req:reply(400, [], jsonify_error(Msg), Req), 
-	Reply.
+reply(ok, Req, Code, Data) ->
+	Json = slim_json:encode([{status, ok}, {data, Data}]),
+	{ok, Reply} = cowboy_req:reply(Code, [], Json, Req), 
+	Reply;
 
-reply401(Req, Msg) ->
-	{ok, Reply} = cowboy_req:reply(401, [], jsonify_error(Msg), Req), 
-	Reply.
-
-reply(Req, Code, Data) ->
-	{ok, Reply} = cowboy_req:reply(Code, [], slim_json:encode(Data), Req),
+reply(error, Req, Code, Reason) ->
+	Json = slim_json:encode([{status, error}, {reason, Reason}]),
+	{ok, Reply} = cowboy_req:reply(Code, [], Json, Req),
 	Reply.
 
 makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
 	slim_oid:make(Cls, Domain, Name).
-
-jsonify_ok() ->
-	slim_json:encode([{status, ok}]).
-
-jsonify_error(Msg) when is_list(Msg) ->
-    jsonify_error(list_to_binary(Msg));
-
-jsonify_error(Msg) when is_binary(Msg) ->
-	slim_json:encode([{status, error}, {message, Msg}]).
-
-tokens(Path) when is_binary(Path) ->
-	list_to_tuple(binary:split(Path, <<"/">>, [global])).
-
 

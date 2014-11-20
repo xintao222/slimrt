@@ -56,7 +56,7 @@
 		terminate/2, 
 		code_change/3]).
 
--record(state, {oid, endpoint, ref, buddies, rooms, clients = []}).
+-record(state, {oid, ref, buddies, rooms, clients = []}).
 
 %online
 %offline

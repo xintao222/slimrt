@@ -24,9 +24,9 @@
 
 %%TODO: FIXME Later
 -define(SLIM_HTTP_APIS, [
-	"/presences/online",
-	"/presences/offline",
-	"/presences/show",
+	"/clients/online",
+	"/clients/offline",
+	"/presences/set",
 	"/presences",
 	"/messages/send",
 	"/messages/push",

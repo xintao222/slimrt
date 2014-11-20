@@ -34,30 +34,39 @@
 
 -export([online/2, offline/2]).
 
-online(Oid, Params) ->
-    Nick = get_value(<<"nick">>, Params),
-    {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
-    Domain = get_value(<<"domain">>, Params),
+input(<<"buddies">>, Domain, Params) ->
+	Input = get_value(<<"buddies">>, Params, <<>>),
+    lists:map(fun(I) -> 
+		{Tag, Id} = slim_id:parse(I),
+		slim_oid:make(Tag, Domain, Id)
+	end, bsplit(Input, <<",">>));
+
+input(<<"rooms">>, Domain, Params) ->
     Rooms = get_value(<<"rooms">>, Params, <<>>),
-    Buddies = get_value(<<"buddies">>, Params, <<>>),
+    [slim_oid:make(gid, Domain, Room) 
+		|| Room <- bsplit(Rooms, <<",">>)];
+
+input(Key, Params) when is_binary(Key) ->
+	get_value(Key, Params).
+
+online(FromOid, Params) ->
+	%domain
+    Domain = get_value(<<"domain">>, Params),
+
+	%properties
+    Nick = get_value(<<"nick">>, Params),
     Show = get_value(<<"show">>, Params, <<"available">>),
     Status = get_value(<<"status">>, Params, <<>>),
-    UserOid = slim_oid:make(Class, Domain, Name),
-    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, <<",">>)],
-    Buddies1 = lists:map(fun(Buddy) -> 
-		{Cls, Id} = slim_id:parse(Buddy),
-		slim_oid:make(Cls, Domain, Id)
-	end, bsplit(Buddies, <<",">>)),
+
+	%%buddies
+    Buddies = input(<<"buddies">>, Params),
+	Rooms = input(<<"rooms">>, Params),
+
     {ok, CPid} =
     case slim_router:lookup(UserOid) of
     [] ->
-        Endpoint = #slim_endpoint{oid = UserOid, 
-							 	name = Name, 
-							 	nick = Nick, 
-							 	domain = Domain, 
-							 	show = binary_to_atom(Show, utf8), %%TODO: atom or binary??
-							 	status = Status},
-        slim_endpoint_sup:start_child({Endpoint, Buddies1, Rooms1});
+        slim_endpoint_sup:start_child({FromOid, Buddies, Rooms});
+		%%FIXME Later: slim_endpoint:send(#slim_presence{});
     [Route = #slim_route{pid=Pid, show = OldShow}] ->
 		%在线支持好友关系问题
 		slim_endpoint:update(Pid, {buddies, Buddies1}),
@@ -69,12 +78,12 @@ online(Oid, Params) ->
         end,
         {ok, Route#slim_route.pid}
     end,
+
     Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
     slim_endpoint:bind(CPid, Ticket),
 	%response
 	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
 					<- slim_router:lookup(Buddies1) ],
-	%Totals = [ {slim_oid:name(Room), length(slim_grpchat:members(Room))} || Room <- Rooms1 ],
 	%TODO: FIX SERVER
 	Data = [{success, true},
             {ticket, slim_ticket:encode(Ticket)},
@@ -101,23 +110,61 @@ offline(Ticket, Params) ->
 		slim_endpoint:unbind(Pid, Ticket)
 	end.
 
-get_presences(Domain, Params) ->
-	Ids = binary:split(get_value(ids, Params), [<<",">>], [global]),
+%%TODO: should be fixed...
+get_presences(Domain, Ids) when is_list(Ids) ->
 	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
 				  slim_oid:make(Cls, Domain, Id) 
 		    end || RawId <- Ids],
-	[ {slim_id:from(O), Show} 
-		|| #slim_route{oid = O, show = Show} 
-		<- slim_router:lookup(Oids) ].
+	[ {slim_id:from(O), Show} || 
+		#slim_route{oid = O, show = Show} <- slim_router:lookup(Oids) ].
 
 set_presence(Params) ->
     ok.
 
-send_message() ->
-    ok.
+send_message(Ticket, Params) ->
+	%from
+    Domain = get_value(<<"domain">>, Params),
+	FromOid = makeoid(Domain, Ticket),
+	
+	%type
+	Type = get_value(<<"type">>, Params, <<"chat">>),
 
-push_message() ->
-    ok.
+	%to
+	{ToCls, To} = slim_id:parse(get_value(<<"to">>, Params)),
+	ToOid = 
+	case Type of
+	<<"chat">> -> 
+		slim_oid:make(ToCls, Domain, To);
+	<<"grpchat">> -> 
+		slim_oid:make(gid, Domain, To)
+	end,
+	Message = slim_message:make(Type, FromOid, ToOid, Params),
+	case slim_cm:lookup(Ticket) of
+	Pid when is_pid(Pid) ->
+		slim_endpoint:send(Pid, Ticket, ToOid, Message);
+	undefined -> 
+		{error, "Client Not Found"}
+	end.
+
+makeoid(Domain, Type, Name) ->
+	%%FIXME:......
+	{Tag, To} = slim_id:parse(get_value(<<"to">>, Params)),
+	case Type of
+	<<"chat">> -> 
+		slim_oid:make(Tag, Domain, To);
+	<<"grpchat">> -> 
+		slim_oid:make(gid, Domain, To)
+	end.
+
+push_message(FromOid, Params) ->
+	%%FIXME:......
+	Domain = get_value(<<"domain">>, Params),
+	Type = get_value(<<"type">>, Params, <<"chat">>),
+	To = get_value(<<"to">>, Params), 
+	ToOid = makeoid(Domain, Type, To),
+	Message = slim_message:make(Type, FromOid, ToOid, Params),
+	%publish directly
+	slim_router:route(FromOid, ToOid, Message).
 
 join_room() ->
     ok.
