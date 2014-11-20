@@ -34,21 +34,6 @@
 
 -export([online/2, offline/2]).
 
-input(<<"buddies">>, Domain, Params) ->
-	Input = get_value(<<"buddies">>, Params, <<>>),
-    lists:map(fun(I) -> 
-		{Tag, Id} = slim_id:parse(I),
-		slim_oid:make(Tag, Domain, Id)
-	end, bsplit(Input, <<",">>));
-
-input(<<"rooms">>, Domain, Params) ->
-    Rooms = get_value(<<"rooms">>, Params, <<>>),
-    [slim_oid:make(gid, Domain, Room) 
-		|| Room <- bsplit(Rooms, <<",">>)];
-
-input(Key, Params) when is_binary(Key) ->
-	get_value(Key, Params).
-
 online(FromOid, Params) ->
 	%domain
     Domain = get_value(<<"domain">>, Params),
@@ -59,11 +44,11 @@ online(FromOid, Params) ->
     Status = get_value(<<"status">>, Params, <<>>),
 
 	%%buddies
-    Buddies = input(<<"buddies">>, Params),
-	Rooms = input(<<"rooms">>, Params),
+    Buddies = parse(buddies, Domain, Params),
+	Rooms = parse(rooms, Domain, Params),
 
     {ok, CPid} =
-    case slim_router:lookup(UserOid) of
+    case slim_router:lookup(FromOid) of
     [] ->
         slim_endpoint_sup:start_child({FromOid, Buddies, Rooms});
 		%%FIXME Later: slim_endpoint:send(#slim_presence{});
@@ -79,28 +64,17 @@ online(FromOid, Params) ->
         {ok, Route#slim_route.pid}
     end,
 
-    Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
-    slim_endpoint:bind(CPid, Ticket),
+	{ok, Ticket} = slim_endpoint:bind(Endpoint);
+	Response = [{ticket, slim_ticket:encode(Ticket)},
+                {server, slim_port:addrs()}],
+
 	%response
-	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
-					<- slim_router:lookup(Buddies1) ],
-	%TODO: FIX SERVER
-	Data = [{success, true},
-            {ticket, slim_ticket:encode(Ticket)},
-            {server, [{jsonpd, slim_port:addr(jsonp)}, {websocket, slim_port:addr(wsocket)}]}
-		   ],
-    Data1 = 
-    case slimrt_port:isopened(mqttd) of
-    true -> [{mqttd, slim_port:addr(mqtt)} | Data];
-    _ -> Data
-    end,
-    Data2 = 
-    case Presences of
-    [] -> [{presences, {}}|Data1];
-    _ -> [{presences, Presences}|Data1]
-    end,
-	?INFO("Response: ~p", [Data2]),
-	{ok, Data2}.
+    case presences(Buddies) of
+    [ ] ->
+		[{presences, {}} | Response];
+    Presences ->
+		[{presences, Presences} | Response]
+    end.
 
 offline(Ticket, Params) ->
 	case slim_climgr:lookup(Ticket) of
@@ -111,12 +85,14 @@ offline(Ticket, Params) ->
 	end.
 
 %%TODO: should be fixed...
-get_presences(Domain, Ids) when is_list(Ids) ->
+presences(Domain, Ids) when is_list(Ids) ->
 	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
 				  slim_oid:make(Cls, Domain, Id) 
 		    end || RawId <- Ids],
-	[ {slim_id:from(O), Show} || 
-		#slim_route{oid = O, show = Show} <- slim_router:lookup(Oids) ].
+	presences(Oids).
+
+presences(Oids) when is_list(Oids) ->
+	[ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} <- slim_router:lookup(Oids) ].
 
 set_presence(Params) ->
     ok.
@@ -181,7 +157,22 @@ subscribe(Endpoint, Ticket) when is_pid(Endpoint) and ?is_ticket(Ticket) ->
 unsubscribe(Endpoint, Ticket) ->
 	slim_endpoint:unsubscribe(Endpoint, Ticket, self()).
 
+%%---------------------------------------------------
+%% internal 
+%%---------------------------------------------------
 bsplit(Bin, Sep) ->
 	binary:split(Bin, [Sep], [global]).
+
+parse(buddies, Domain, Params) ->
+	Input = get_value(<<"buddies">>, Params, <<>>),
+    lists:map(fun(I) -> 
+		{Tag, Id} = slim_id:parse(I),
+		slim_oid:make(Tag, Domain, Id)
+	end, bsplit(Input, <<",">>));
+
+parse(rooms, Domain, Params) ->
+    Rooms = get_value(<<"rooms">>, Params, <<>>),
+    [slim_oid:make(gid, Domain, Room) 
+		|| Room <- bsplit(Rooms, <<",">>)];
 
 

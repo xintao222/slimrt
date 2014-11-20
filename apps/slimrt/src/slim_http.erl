@@ -41,7 +41,7 @@ init(Req, Opts) ->
 		{ok, Resp} = handle(Req, Opts),
 		{ok, Resp, Opts};
 	{false, Error} ->
-		{ok, reply401(Req, Error), Opts}
+		{ok, reply(error, Req, 401, Error), Opts}
 	end.
 
 authorized(Req) ->
@@ -61,7 +61,7 @@ handle(Req, _Opts) ->
 	<<"/", ?APIVSN, Path/binary>> ->
 		handle(Req, Method, Path);
 	_ ->
-		{ok, reply400(Req, <<"Bad Path">>)}
+		{ok, reply(error, Req, 400, <<"Bad Path">>)}
 	end.
 
 handle(Req, <<"POST">>, <<"/clients/online">>) ->
@@ -101,19 +101,19 @@ handle(Req, <<"POST">>, <<"/messages/send">>) ->
 		reply(ok, Req, 200);
 	{error, Reason} ->
 		reply(error, Req, 500, Reason)
-	end.
+	end;
 
 handle(Req, <<"POST">>, <<"/messages/push">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
 	Domain = get_value(<<"domain">>, Params),
 	{FromCls, From} = slim_id:parse(get_value(<<"from">>, Params)),
-	FromOid = #slim_oid{FromCls, Domain, From},
+	FromOid = slim_oid:make(FromCls, Domain, From),
 	case slim_client:push_message(FromOid, Params) of
 	ok ->
 		reply(ok, Req, 200);
 	{error, Reason} ->
 		reply(error, Req, 500, Reason)
-	end.
+	end;
 
 handle(Req, <<"POST">>, <<"/rooms/join">>) ->
 	{ok, Req};
@@ -124,7 +124,7 @@ handle(Req, <<"POST">>, <<"/rooms/members">>) ->
 	{ok, Req};
 
 handle(Req, _Method, _Path) ->
-	{ok, reply400(Req, <<"Bad Request">>)}.
+	{ok, reply(error, Req, 400, <<"Bad Request">>)}.
 
 terminate(_Reason, _Req, _Opts) ->
 	ok.

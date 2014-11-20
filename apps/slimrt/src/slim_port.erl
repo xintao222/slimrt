@@ -26,6 +26,7 @@
 
 -export([open/3,
 		 isopened/1,
+		 addrs/0,
 		 addr/1]).
 
 %SockOpts = [binary,
@@ -44,6 +45,12 @@ open(Name, Module, Opts) ->
 isopened(_Name) ->
 	true.
 
+%%SHOULD be moved to slimrt.erl
+addrs() ->
+	[{Name, addr(Name)} || Name <- [jsonpd, websocket]].
+
+
+
 %TODO:   
 addr(jsonp) ->
 	<<"http://localhost:8080/v1/packets">>;
@@ -54,3 +61,11 @@ addr(mqtt) ->
 addr(wsocket) ->
 	<<"http://localhost:8080/v1/wsocket">>.  
 
+
+%
+	%TODO: FIX SERVER
+ %   Data1 = 
+ %   case slimrt_port:isopened(mqttd) of
+ %   true -> [{mqttd, slim_port:addr(mqtt)} | Data];
+ %   _ -> Data
+ %   end,

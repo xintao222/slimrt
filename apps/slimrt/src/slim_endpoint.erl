@@ -216,6 +216,13 @@ handle_call(info, _From, State) ->
     {reply, {ok, State}, State};
 
 handle_call({bind, Ticket}, _From, #state{endpoint = #slim_endpoint{oid = Oid}, ref = IdleTimer, clients = Clients} = State) ->
+
+    Ticket = slim_ticket:make(UserOid#slim_oid.class, Name),
+
+	%%TODO: FIX
+	%%slim_cm:create(#slim_client{ticket = Ticket, }),
+
+
 	?INFO("bind: ~p", [Ticket]),
 	cancel_timer(IdleTimer),
 	undefined = get(Ticket),
