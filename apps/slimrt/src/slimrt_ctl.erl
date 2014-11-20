@@ -24,6 +24,8 @@
 
 -author('feng.lee@slimchat.io').
 
+-include("slim_log.hrl").
+
 -export([status/1, 
         vmstats/1,
 		metrics/1, 

@@ -2,6 +2,8 @@
 
 -author('feng.lee@slimchat.io').
 
+-include_lib("slimpp/include/slimpp.hrl").
+
 -include("slimrt.hrl").
 
 -export([start_link/0]).

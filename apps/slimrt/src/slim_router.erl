@@ -24,6 +24,10 @@
 
 -author('feng.lee@slimchat.io').
 
+-include_lib("slimpp/include/slimpp.hrl").
+
+-include("slimrt.hrl").
+
 -behaviour(gen_server).
 
 -define(SERVER, ?MODULE).
@@ -64,7 +68,7 @@ start_link() ->
 %%
 %% @doc Lookup route with oid
 %%
--spec lookup(Oid :: oid()) -> list(#slimrt_route{}).
+-spec lookup(Oid :: oid()) -> list(route()).
 lookup(Oid) when is_record(Oid, slim_oid) ->
 	mnesia:dirty_read({slim_route, Oid});
 
@@ -85,7 +89,7 @@ register(Route = #slim_route{oid=Oid, pid=Pid}) ->
 %%
 %% @doc update presence show.
 %%
--spec update({Oid :: oid(), Show :: atom()) -> ok.
+-spec update({Oid :: oid(), Show :: atom()}) -> ok.
 update({Oid, Show}) when is_record(Oid, slim_oid) ->
     mnesia:sync_dirty(fun() -> 
         case mnesia:read(slim_route, Oid, write) of
@@ -118,7 +122,7 @@ route(_From, To, Packet) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init(Args) ->
+init(_Args) ->
 	process_flag(trap_exit, true),
 	mnesia:create_table(slim_route,
 		[{ram_copies, [node()]},
@@ -127,7 +131,7 @@ init(Args) ->
 	mnesia:add_table_copy(slim_route, node(), ram_copies),
     {ok, state}.
 
-handle_call({register, #slim_route{oid = Oid, pid = Pid}}, _From, State) ->
+handle_call({register, Route = #slim_route{oid = Oid, pid = Pid}}, _From, State) ->
     Mon = erlang:monitor(process, Pid),
     mnesia:dirty_write(Route#slim_route{mon = Mon}),
     slim_meter:incr(route, slim_oid:domain(Oid)),

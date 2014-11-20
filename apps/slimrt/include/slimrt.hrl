@@ -30,7 +30,7 @@
 %each client has a ticket :)
 -record(slim_client, {
     ticket		:: ticket(),
-    spid		:: pid(),
+    pid		:: pid(),
     ref			:: reference(),
     mon			:: reference(),
     type		:: atom(),
@@ -49,6 +49,7 @@
     name	:: binary(),
     nick	:: binary(),
     domain	:: binary(),
+	status	:: binary(),
     show = available	:: presence_show()
 }).
 
@@ -77,7 +78,7 @@
 	nick	:: binary()
 }).
 
--type room() :: #slim_room().
+-type room() :: #slim_room{}.
 
 -define(is_room(Record), is_record(Record, slim_room)).
 

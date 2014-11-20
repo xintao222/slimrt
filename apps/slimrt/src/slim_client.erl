@@ -24,22 +24,30 @@
 
 -author('feng.lee@slimchat.io').
 
+-include_lib("slimpp/include/slimpp.hrl").
+
+-include("slimrt.hrl").
+
+-include("slim_log.hrl").
+
+-import(proplists, [get_value/2, get_value/3]).
+
 -export([online/2, offline/2]).
 
 online(Oid, Params) ->
-    Nick = g(<<"nick">>, Params),
-    {Class, Name} = slim_id:parse(g(<<"name">>, Params)),
-    Domain = g(<<"domain">>, Params),
-    Rooms = g(<<"rooms">>, Params, <<>>),
-    Buddies = g(<<"buddies">>, Params, <<>>),
-    Show = g(<<"show">>, Params, <<"available">>),
-    Status = g<<"(status">>, Params, <<>>),
+    Nick = get_value(<<"nick">>, Params),
+    {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
+    Domain = get_value(<<"domain">>, Params),
+    Rooms = get_value(<<"rooms">>, Params, <<>>),
+    Buddies = get_value(<<"buddies">>, Params, <<>>),
+    Show = get_value(<<"show">>, Params, <<"available">>),
+    Status = get_value(<<"status">>, Params, <<>>),
     UserOid = slim_oid:make(Class, Domain, Name),
-    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, $,)],
+    Rooms1 = [slim_oid:make(gid, Domain, Room) || Room <- bsplit(Rooms, <<",">>)],
     Buddies1 = lists:map(fun(Buddy) -> 
 		{Cls, Id} = slim_id:parse(Buddy),
 		slim_oid:make(Cls, Domain, Id)
-	end, bsplit(Buddies, $,)),
+	end, bsplit(Buddies, <<",">>)),
     {ok, CPid} =
     case slim_router:lookup(UserOid) of
     [] ->
@@ -47,7 +55,7 @@ online(Oid, Params) ->
 							 	name = Name, 
 							 	nick = Nick, 
 							 	domain = Domain, 
-							 	show = binary_to_atom(Show),
+							 	show = binary_to_atom(Show, utf8), %%TODO: atom or binary??
 							 	status = Status},
         slim_endpoint_sup:start_child({Endpoint, Buddies1, Rooms1});
     [Route = #slim_route{pid=Pid, show = OldShow}] ->
@@ -67,7 +75,7 @@ online(Oid, Params) ->
 	Presences = [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} 
 					<- slim_router:lookup(Buddies1) ],
 	%Totals = [ {slim_oid:name(Room), length(slim_grpchat:members(Room))} || Room <- Rooms1 ],
-	//TODO: FIX SERVER
+	%TODO: FIX SERVER
 	Data = [{success, true},
             {ticket, slim_ticket:encode(Ticket)},
             {server, [{jsonpd, slim_port:addr(jsonp)}, {websocket, slim_port:addr(wsocket)}]}
@@ -83,8 +91,7 @@ online(Oid, Params) ->
     _ -> [{presences, Presences}|Data1]
     end,
 	?INFO("Response: ~p", [Data2]),
-	{ok, reply200(Req, Data2), State};
-    ok.
+	{ok, Data2}.
 
 offline(Ticket, Params) ->
 	case slim_climgr:lookup(Ticket) of
@@ -120,5 +127,14 @@ leave_room() ->
 
 room_members() ->
     ok.
+
+subscribe(Endpoint, Ticket) when is_pid(Endpoint) and ?is_ticket(Ticket) ->
+	slim_endpoint:subscribe(Endpoint, Ticket, self()).
+
+unsubscribe(Endpoint, Ticket) ->
+	slim_endpoint:unsubscribe(Endpoint, Ticket, self()).
+
+bsplit(Bin, Sep) ->
+	binary:split(Bin, [Sep], [global]).
 
 

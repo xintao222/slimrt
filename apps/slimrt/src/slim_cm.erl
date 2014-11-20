@@ -21,7 +21,9 @@
 %%------------------------------------------------------------------------------
 
 %client manager
--module(slim_climgr).
+-module(slim_cm).
+
+-include_lib("slimpp/include/slimpp.hrl").
 
 -behaviour(gen_server).
 

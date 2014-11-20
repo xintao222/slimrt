@@ -22,9 +22,11 @@
 
 -module(slim_http).
 
+-include_lib("slimpp/include/slimpp.hrl").
+
 -include("slimrt.hrl").
 
--include_lib("slimpp/include/slimpp.hrl").
+-include("slim_api.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
 
@@ -49,21 +51,21 @@ authorized(Req) ->
         true -> true;
         {error, Error} -> {false, Error}
         end;
-    Auth ->
-        {false, <<"Basic realm=\"", Domain, "\"">>}
+    _Auth ->
+        {false, <<"Fobbiden">>}
     end.
 
-handle(Req, Opts) ->
+handle(Req, _Opts) ->
 	Method = cowboy_req:method(Req),
 	Path = cowboy_req:path(Req),
 	case Path of 
 	<<"/", ?APIVSN, ApiPath/binary>> ->
-		handle(Req, Method, ApiPath, Opts).
+		handle(Req, Method, ApiPath);
 	_ ->
-		{ok, reply400(Req, <<"Bad Api Path">>)};
+		{ok, reply400(Req, <<"Bad Api Path">>)}
 	end.
 
-handle(Req, <<"POST">>, <<"/presences/online">>, Opts) ->
+handle(Req, <<"POST">>, <<"/presences/online">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Domain = get_value(<<"domain">>, Params),
     {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
@@ -76,34 +78,32 @@ handle(Req, <<"POST">>, <<"/presences/online">>, Opts) ->
 		{ok, reply(Req1, Code, Reason)}
 	end;
 
-handle(Req, <<"POST">>, <<"/presences/offline">>, Opts) ->
+handle(Req, <<"POST">>, <<"/presences/offline">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
-	slim_client:offline(Ticket, Params);
-	{ok, reply(Req1, 200, [{status, ok}]}.
+	slim_client:offline(Ticket, Params),
+	{ok, reply(Req1, 200, [{status, ok}])};
 
-handle(Req, <<"POST">>, <<"/presences/show">>, Opts) ->
+handle(Req, <<"POST">>, <<"/presences/show">>) ->
 	{ok, Req};
 
-handle(Req, <<"GET">>, <<"/presences">>, Opts) ->
-    Domain = g(domain, Params),
+handle(Req, <<"GET">>, <<"/presences">>) ->
+	{ok, Params} = cowboy_req:qs_vals(Req),
+    Domain = get_value(<<"domain">>, Params),
 	Presences = slim_client:get_presences(Domain, Params),
 	{ok, reply(Req, 200, [{data, Presences}])};
-	
 
-handle(Req, <<"POST">>, <<"/messages/send">>, Opts) ->
+handle(Req, <<"POST">>, <<"/messages/send">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),	
-
 	%Domain
-    Domain = g(<<"domain">>, Params),
-
-	//TODO:......
+    Domain = get_value(<<"domain">>, Params),
+	%%TODO:......
 
 	%FromOid
 	{Ticket, FromOid} =
-	case g(<<"ticket">>, Params) of
+	case get_value(<<"ticket">>, Params) of
 	undefined -> %Push Message
-		{FromCls, From} = slim_id:parse(g(<<"from">>, Params)),
+		{FromCls, From} = slim_id:parse(get_value(<<"from">>, Params)),
 		{undefined, slim_oid:make(FromCls, Domain, From)};
 	S -> %Send Message
 		T = slim_ticket:make(S),
@@ -111,8 +111,8 @@ handle(Req, <<"POST">>, <<"/messages/send">>, Opts) ->
 	end,
 
 	%ToOid
-	Type = binary_to_atom(g(<<"type">>, Params, <<"chat">>)),
-	{ToCls, To} = slim_id:parse(g(<<"to">>, Params)),
+	Type = binary_to_atom(get_value(<<"type">>, Params, <<"chat">>), utf8),
+	{ToCls, To} = slim_id:parse(get_value(<<"to">>, Params)),
 	ToOid = 
 	case Type of
 	chat -> 
@@ -122,28 +122,28 @@ handle(Req, <<"POST">>, <<"/messages/send">>, Opts) ->
 	end,
 	
 	Message = slim_message:make(Type, FromOid, ToOid, Params),
-	case slim_router:lookup(UserOid) of
+	case slim_router:lookup(FromOid) of
 	[#slim_route{pid=CPid}] ->
 		%send message
 		slim_endpoint:send(CPid, Ticket, ToOid, Message);
 	[] ->
 		%publish directly
-		slim_router:route(UserOid, ToOid, Message)
+		slim_router:route(FromOid, ToOid, Message)
 	end,
 	{ok, replyok(Req1)};
 
-handle(Req, <<"POST">>, <<"/messages/push">>, Opts) ->
+handle(Req, <<"POST">>, <<"/messages/push">>) ->
 	{ok, Req};
 
-handle(Req, <<"POST">>, <<"/rooms/join">>, Opts) ->
+handle(Req, <<"POST">>, <<"/rooms/join">>) ->
 	{ok, Req};
-handle(Req, <<"POST">>, <<"/rooms/leave">>, Opts) ->
+handle(Req, <<"POST">>, <<"/rooms/leave">>) ->
 	{ok, Req};
-handle(Req, <<"POST">>, <<"/rooms/members">>, Opts) ->
+handle(Req, <<"POST">>, <<"/rooms/members">>) ->
 	{ok, Req};
 
-handle(Req, Method, Path, Opts) ->
-	{ok, reply400(Req, <<"Bad Request">>)};
+handle(Req, _Method, _Path) ->
+	{ok, reply400(Req, <<"Bad Request">>)}.
 
 terminate(_Reason, _Req, _Opts) ->
 	ok.
@@ -153,7 +153,8 @@ replyok(Req) ->
 	Reply.
 
 reply200(Req, Term) ->
-	{ok, Reply} = cowboy_req:reply(200, [{"Content-Type", "text/plain"}], jsonify(Term), Req), 
+	Json = slim_json:encode(Term),
+	{ok, Reply} = cowboy_req:reply(200, [{"Content-Type", "text/plain"}], Json, Req), 
 	Reply.
 	
 reply400(Req, Msg) ->
@@ -164,17 +165,21 @@ reply401(Req, Msg) ->
 	{ok, Reply} = cowboy_req:reply(401, [], jsonify_error(Msg), Req), 
 	Reply.
 
+reply(Req, Code, Data) ->
+	{ok, Reply} = cowboy_req:reply(Code, [], slim_json:encode(Data), Req),
+	Reply.
+
 makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
 	slim_oid:make(Cls, Domain, Name).
 
 jsonify_ok() ->
-	jsonify([{status, ok}]).
+	slim_json:encode([{status, ok}]).
 
 jsonify_error(Msg) when is_list(Msg) ->
     jsonify_error(list_to_binary(Msg));
 
 jsonify_error(Msg) when is_binary(Msg) ->
-	jsonify([{status, error}, {message, Msg}]).
+	slim_json:encode([{status, error}, {message, Msg}]).
 
 tokens(Path) when is_binary(Path) ->
 	list_to_tuple(binary:split(Path, <<"/">>, [global])).

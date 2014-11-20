@@ -28,6 +28,8 @@
 
 -include("slimrt.hrl").
 
+-include("slim_log.hrl").
+
 -import(erlang, [send_after/3]).
 
 -export([start_link/1,
@@ -35,13 +37,13 @@
 		buddies/2,
         bind/2, 
 		unbind/2, 
-		subscribe/4, 
+		subscribe/3, 
 		unsubscribe/3, 
 		send/4, 
 		send/2,
         update/2]).
 
-%Group operation
+%TODO: Group operation
 -export([join/3,
 		leave/3]).
 
@@ -54,102 +56,94 @@
 		terminate/2, 
 		code_change/3]).
 
--record(state, {endpoint, ref, subscribers = []]}).
-
+-record(state, {oid, endpoint, ref, buddies, rooms, clients = []}).
 
 %online
 %offline
 %subscribe
 %unsubscribe
 %TODO: THIS FILE SHOULD BE REWRITE LATER.
--spec start_link({Client :: #slim_endpoint{}, 
+-spec start_link({Endpoint :: #slim_endpoint{}, 
 				  Buddies :: list(), 
 				  Rooms :: list()}) -> 
 	{ok, pid()} | ignore | {error, term()}.
-start_link({Client, Buddies, Rooms}) ->
-    gen_server:start_link(?MODULE, [{Client, Buddies, Rooms}], []).
+start_link({Endpoint, Buddies, Rooms}) ->
+    gen_server:start_link(?MODULE, [{Endpoint, Buddies, Rooms}], []).
 
 %%
 %% @doc endpoint information.
 %% 
--spec info(CPid :: pid()) -> {ok, #slim_endpoint{}}.
-info(CPid) ->
-    gen_server:call(CPid, info).
+-spec info(Pid :: pid()) -> {ok, #slim_endpoint{}}.
+info(Pid) ->
+    gen_server:call(Pid, info).
 
--spec add_buddies(CPid :: pid(), Buddies :: list(oid())) -> ok.
-buddies(CPid, Buddies) ->
-	gen_server:call(CPid, {buddies, Buddies}).
-
+%%FIXME Later
+-spec add_buddies(Pid :: pid(), Buddies :: list(oid())) -> ok.
+buddies(Pid, Buddies) ->
+	gen_server:call(Pid, {buddies, Buddies}).
 
 %%
 %% @doc bind a session to this endpoint, a session is a browser tab or window.
 %%
--spec bind(CPid :: pid(), Ticket :: ticket()) -> ok.
-bind(CPid, Ticket) when is_record(Ticket, slim_ticket)->
-	gen_server:call(CPid, {bind, Ticket}).
+-spec bind(Pid :: pid(), Ticket :: ticket()) -> ok.
+bind(Pid, Ticket) when is_record(Ticket, slim_ticket)->
+	gen_server:call(Pid, {bind, Ticket}).
     
 %%
 %% @doc a session subscribe to this endpoint.
 %%
--spec subscribe(Type 	:: subscriber_type(), 
-				CPid 	:: pid(), 
+-spec subscribe(Pid 	:: pid(), 
 				Ticket 	:: ticket(),
 				SPid 	:: pid()) -> ok. 
-subscribe(Type, CPid, Ticket, SPid) when is_record(Ticket, slim_ticket) ->
-	gen_server:cast(CPid, {subscribe, Type, Ticket, SPid}).
+subscribe(Pid, Ticket, SPid) when is_record(Ticket, slim_ticket) ->
+	gen_server:cast(Pid, {subscribe, Ticket, SPid}).
 
 %%
 %% @doc a session unsubscribe to this endpoint.
 %%
--spec unsubscribe(CPid :: pid(), Ticket :: ticket(), SPid :: pid()) -> ok.
-unsubscribe(CPid, Ticket, SPid) ->
-	gen_server:cast(CPid, {unsubscribe, Ticket, SPid}).
+-spec unsubscribe(Pid :: pid(), Ticket :: ticket(), SPid :: pid()) -> ok.
+unsubscribe(Pid, Ticket, SPid) ->
+	gen_server:cast(Pid, {unsubscribe, Ticket, SPid}).
 
 %%
 %% @doc a session unbind this endpoint, a browser tab or window is closed.
 %%
--spec unbind(CPid :: pid(), Ticket :: ticket()) -> ok.
-unbind(CPid, Ticket)  ->
-	gen_server:call(CPid, {unbind, Ticket}).
-
-%%
-%% @doc send a status, message or presence.
-%%
--spec send(CPid :: pid(), Ticket :: ticket(), To :: oid(), 
-		Packet :: #slim_status{} | #slim_message{}) -> ok.
-send(CPid, Ticket, To, Status) when is_record(Status, slim_status) ->
-	gen_server:cast(CPid, {status, Ticket, To, Status});
+-spec unbind(Pid :: pid(), Ticket :: ticket()) -> ok.
+unbind(Pid, Ticket)  ->
+	gen_server:call(Pid, {unbind, Ticket}).
 
 %%
 %% @doc send a message.
 %%
-send(CPid, Ticket, To, Message) when is_record(Message, slim_message) ->
-	gen_server:cast(CPid, {message, Ticket, To, Message}).
+-spec send(Pid :: pid(), Ticket :: ticket(), To :: oid(), 
+		Packet :: message()) -> ok.
+send(Pid, Ticket, To, Message) when is_record(Message, slim_message) ->
+	gen_server:cast(Pid, {message, Ticket, To, Message}).
 
 %%
 %% @doc send presence.
 %%
--spec send(CPid :: pid(), Presence :: #slim_presence{}) -> ok.
-send(CPid, Presence) when is_record(Presence, slim_presence) ->
-	gen_server:cast(CPid, {presence, Presence}).
+-spec send(Pid :: pid(), Presence :: #slim_presence{}) -> ok.
+send(Pid, Presence) when is_record(Presence, slim_presence) ->
+	gen_server:cast(Pid, {presence, Presence}).
 
--spec update(CPid :: pid(), Data :: tuple()) -> ok.
-update(CPid, Data) ->
-    gen_server:cast(CPid, {update, Data}).
+-spec update(Pid :: pid(), Data :: tuple()) -> ok.
+update(Pid, Data) ->
+    gen_server:cast(Pid, {update, Data}).
 
 %%
 %% @doc endpoint join a room
 %%
--spec join(CPid :: pid(), Gid :: oid(), Nick :: binary()) -> ok.
-join(CPid, Gid, Nick) ->
-	gen_server:call(CPid, {join, Gid, Nick}).
+-spec join(Pid :: pid(), Gid :: oid(), Nick :: binary()) -> ok.
+join(Pid, Gid, Nick) ->
+	gen_server:call(Pid, {join, Gid, Nick}).
 
 %%
 %% @doc endpoint leave a room
 %%
--spec leave(CPid :: pid(), Gid :: oid(), Nick :: binary()) -> ok.
-leave(CPid, Gid, Nick) ->
-	gen_server:call(CPid, {leave, Gid, Nick}).
+-spec leave(Pid :: pid(), Gid :: oid(), Nick :: binary()) -> ok.
+leave(Pid, Gid, Nick) ->
+	gen_server:call(Pid, {leave, Gid, Nick}).
 
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
@@ -158,18 +152,18 @@ leave(CPid, Gid, Nick) ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([{#slim_endpoint{oid = Oid} = Client, Buddies, Rooms}]) ->
+init([{#slim_endpoint{oid = Oid} = Endpoint, Buddies, Rooms}]) ->
     process_flag(trap_exit, true),
-	add_buddies(Client, Buddies),
-	join_rooms(Client, Rooms),
-	register_route(Client),
-	send_available(Client),
-    rooms_online(Client, Rooms),
+	add_buddies(Endpoint, Buddies),
+	join_rooms(Endpoint, Rooms),
+	register_route(Endpoint),
+	send_available(Endpoint),
+    rooms_online(Endpoint, Rooms),
 	Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
-    {ok, #state{oid = Oid, client = Client, ref = Ref, buddies = Buddies, rooms = Rooms}}.
+    {ok, #state{endpoint = Endpoint, ref = Ref, buddies = Buddies, rooms = Rooms}}.
 
 add_buddies(#slim_endpoint{oid = ThisOid}, Buddies) ->
-    Onlines = [Oid || #slim_route{oid = Oid} 
+    Onlines = [Oid || #slim_route{oid = Oid}
 					<- slim_router:lookup(Buddies)],
 	slim_roster:add(ThisOid, Onlines).
 
@@ -221,25 +215,25 @@ rooms_offline(#slim_endpoint{oid = Oid, nick=Nick}, Rooms) ->
 handle_call(info, _From, State) ->
     {reply, {ok, State}, State};
 
-handle_call({bind, Ticket}, _From, #state{oid = Oid, ref = IdleTimer, subscribers = Subscribers} = State) ->
+handle_call({bind, Ticket}, _From, #state{endpoint = #slim_endpoint{oid = Oid}, ref = IdleTimer, clients = Clients} = State) ->
 	?INFO("bind: ~p", [Ticket]),
 	cancel_timer(IdleTimer),
 	undefined = get(Ticket),
 	Ref = send_after(?IDLE_TIMEOUT, self(), {idle_timeout, Ticket}),
-	Sub = #slim_subscriber{ticket = Ticket, ref = Ref},
-	put(Ticket, Sub),
+	Client = #slim_client{ticket = Ticket, ref = Ref},
+	put(Ticket, Client),
     slim_meter:incr(bind, Oid#slim_oid.domain),
-    {reply, ok, State#state{ref = undefined, subscribers = [Ticket|Subscribers]}};
+    {reply, ok, State#state{ref = undefined, clients = [Ticket|Clients]}};
 
-handle_call({unbind, Ticket}, _From, #state{oid = Oid, subscribers = Subscribers} = State) ->
+handle_call({unbind, Ticket}, _From, #state{oid = Oid, clients = Clients} = State) ->
 	?INFO("unbind: ~p", [Ticket]),
 	NewState = 
 	case get(Ticket) of
-    Sub when is_record(Sub, slim_subscriber) ->
+    Client when ?is_client(Client) ->
 		%TODO: mon is undefined???
-		try_demonitor(Sub#slim_subscriber.mon),
-		cancel_timer(Sub#slim_subscriber.ref),
-		case Sub#slim_subscriber.spid of
+		try_demonitor(Client#slim_client.mon),
+		cancel_timer(Client#slim_client.ref),
+		case Client#slim_client.pid of
 		undefined -> 
 			ok;
 		SPid ->
@@ -249,13 +243,13 @@ handle_call({unbind, Ticket}, _From, #state{oid = Oid, subscribers = Subscribers
 			end
 		end,
 		erase(Ticket),
-		Subscribers1 = lists:delete(Ticket, Subscribers),
-		case length(Subscribers1) of
+		Clients1 = lists:delete(Ticket, Clients),
+		case length(Clients1) of
 		0 ->
 			Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
-			State#state{ref = Ref, subscribers = Subscribers1};
+			State#state{ref = Ref, clients = Clients1};
 		_ ->
-			State#state{subscribers = Subscribers1}	
+			State#state{clients = Clients1}	
 		end;
 	undefined ->
         ?WARNING("unbind ticket is not existed: ~p", [Ticket]),
@@ -265,8 +259,8 @@ handle_call({unbind, Ticket}, _From, #state{oid = Oid, subscribers = Subscribers
 	{reply, ok, NewState};
 
 
-handle_call({join, Gid, Nick}, _From, State = #state{client=Client}) ->
-	Oid = Client#slim_endpoint.oid,
+handle_call({join, Gid, Nick}, _From, State = #state{endpoint = Endpoint}) ->
+	Oid = Endpoint#slim_endpoint.oid,
 	slim_grpchat:join(Gid, Oid, self(), Nick),
 	Presence = #slim_presence{
                                 type = join,
@@ -278,8 +272,8 @@ handle_call({join, Gid, Nick}, _From, State = #state{client=Client}) ->
 	slim_router:route(Oid, Gid, Presence), 
 	{reply, {ok, slim_grpchat:members(Gid)}, State};
 
-handle_call({leave, Gid, Nick}, _From, State = #state{client=Client}) ->
-	Oid = Client#slim_endpoint.oid,
+handle_call({leave, Gid, Nick}, _From, State = #state{endpoint=Endpoint}) ->
+	Oid = Endpoint#slim_endpoint.oid,
 	slim_grpchat:leave(Gid, Oid, self()),
 	Presence = #slim_presence{type = leave,
 								from = Oid,
@@ -299,23 +293,23 @@ handle_call(Req, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-handle_cast({update, {buddies, Buddies}}, #state{client=Endpoint} = State) ->
+handle_cast({update, {buddies, Buddies}}, #state{endpoint=Endpoint} = State) ->
     add_buddies(Endpoint, Buddies),
     {noreply, State#state{buddies = Buddies}};
 
-handle_cast({update, {rooms, Rooms}}, #state{client=Endpoint, rooms=OldRooms} = State) ->
+handle_cast({update, {rooms, Rooms}}, #state{endpoint=Endpoint, rooms=OldRooms} = State) ->
     join_rooms(Endpoint, Rooms),
     rooms_online(Endpoint, Rooms -- OldRooms),
     {noreply, State#state{rooms = Rooms}};
 
 handle_cast({subscribe, Type, Ticket, SPid}, State) ->
 	case get(Ticket) of
-	Sub when is_record(Sub, slim_subscriber) ->
+	Client when is_record(Client, slim_client) ->
 		?INFO("subscribe ~p, ~p", [Ticket, SPid]),
-		cancel_timer(Sub#slim_subscriber.ref),
+		cancel_timer(Client#slim_client.ref),
 		%TODO: FIX ME UNDEFINED
-		try_demonitor(Sub#slim_subscriber.mon),
-		case Sub#slim_subscriber.spid of
+		try_demonitor(Client#slim_client.mon),
+		case Client#slim_client.pid of
 		undefined -> 
 			ok;
         SPid ->
@@ -327,53 +321,43 @@ handle_cast({subscribe, Type, Ticket, SPid}, State) ->
 			end
 		end,
         %get packets first
-		Packets = Sub#slim_subscriber.packets,
+		Packets = Client#slim_client.packets,
         %monitor process
         Mon = erlang:monitor(process, SPid),
-        NewSub = Sub#slim_subscriber{spid = SPid, ref = undefined, type = Type, mon = Mon, packets = []},
-        put(Ticket, NewSub),
+        NewClient = Client#slim_client{pid = SPid, ref = undefined, type = Type, mon = Mon, packets = []},
+        put(Ticket, NewClient),
 		case length(Packets) of
 		0 -> ok;
 		_ -> SPid ! {ok, Packets}
 		end;
 	undefined ->
-		?ERROR("illegal subscriber: ~p", [Ticket]),
+		?ERROR("illegal client: ~p", [Ticket]),
 		SPid ! stop
 	end,
 	{noreply, State, hibernate};
 
 handle_cast({unsubscribe, Ticket, SPid}, State) ->
     case get(Ticket) of
-    Sub when is_record(Sub, slim_subscriber)->
+    Client when is_record(Client, slim_client)->
 		if
-		(Sub#slim_subscriber.spid == undefined) or (Sub#slim_subscriber.spid == SPid) ->
+		(Client#slim_client.pid == undefined) or (Client#slim_client.pid == SPid) ->
 			?INFO("unsubscribe ~p ~p", [Ticket, SPid]),
 			%TODO: FIX ME UNDEFINED
-			try_demonitor(Sub#slim_subscriber.mon),
-			cancel_timer(Sub#slim_subscriber.ref),
+			try_demonitor(Client#slim_client.mon),
+			cancel_timer(Client#slim_client.ref),
 			Ref = send_after(?IDLE_TIMEOUT, self(), {idle_timeout, Ticket}),
-            NewSub = Sub#slim_subscriber{spid = undefined, ref = Ref, mon = undefined},
-			put(Ticket, NewSub);
+            NewClient = Client#slim_client{pid = undefined, ref = Ref, mon = undefined},
+			put(Ticket, NewClient);
         true ->
-            ?ERROR("~p cannot not unsubscribe ~p", [SPid, Sub#slim_subscriber.spid])
+            ?ERROR("~p cannot not unsubscribe ~p", [SPid, Client#slim_client.pid])
         end;
     undefined ->
 		?ERROR("unsubscribed ticket is not existed: ~p", [Ticket])
     end,
 	{noreply, State};
 
-handle_cast({status, _Ticket, To, Status}, #state{oid = Oid} = State) ->
-	case slim_router:lookup(To) of
-	[_Route] ->
-		slim_router:route(Oid, To, Status#slim_status{from = Oid});
-	[] ->
-		ok
-	end,
-	slim_meter:incr(status, Oid#slim_oid.domain),
-	{noreply, State};
-
 handle_cast({message, FromTicket, To, Message}, #state{oid = Oid, 
-    subscribers = Subscribers} = State) ->
+    clients = Clients} = State) ->
     %% users ---- pid
     %% sync all browsers of sender
 	Message1 = Message#slim_message{from = Oid},
@@ -383,20 +367,20 @@ handle_cast({message, FromTicket, To, Message}, #state{oid = Oid,
 			pass;
 		false ->
 			case get(Ticket) of
-			Sub when is_record(Sub, slim_subscriber)->
-				Packets = Sub#slim_subscriber.packets,
-				case Sub#slim_subscriber.spid of
+			Client when is_record(Client, slim_client)->
+				Packets = Client#slim_client.packets,
+				case Client#slim_client.pid of
 					undefined ->
-						put(Ticket, Sub#slim_subscriber{packets = [Message1|Packets]});
+						put(Ticket, Client#slim_client{packets = [Message1|Packets]});
 					Pid ->
 						Pid ! {ok, [Message1|Packets]},
 						%TODO: fixme later, should be handled when unsubscribed?
 						if 
-						Sub#slim_subscriber.type == poll ->
-							erlang:demonitor(Sub#slim_subscriber.mon),
-							put(Ticket, Sub#slim_subscriber{spid=undefined, mon=undefined, packets=[]});
-						Sub#slim_subscriber.type == conn ->
-							put(Ticket, Sub#slim_subscriber{packets=[]});
+						Client#slim_client.type == poll ->
+							erlang:demonitor(Client#slim_client.mon),
+							put(Ticket, Client#slim_client{pid=undefined, mon=undefined, packets=[]});
+						Client#slim_client.type == conn ->
+							put(Ticket, Client#slim_client{packets=[]});
 						true ->
 							ignore
 						end
@@ -405,13 +389,13 @@ handle_cast({message, FromTicket, To, Message}, #state{oid = Oid,
 				?ERROR("no subscriber found: ~p", [Ticket])
 			end
 		end
-	end, Subscribers),
+	end, Clients),
 	%%------------------------------------------------------------------------------------
     %% Send Message 
     %% slim_router:route -> slim_endpoint:dispatch =========
     %%                                                     ||
     %%                                                     \/
-    %% ReceiverClient <---LongPoll---> slim_jsonp  <- slim_endpoint:handle_info(packet)
+    %% ReceiverEndpoint <---LongPoll---> slim_jsonp  <- slim_endpoint:handle_info(packet)
 	%%------------------------------------------------------------------------------------
 	%% 
 	slim_router:route(Oid, To, Message1),
@@ -419,12 +403,12 @@ handle_cast({message, FromTicket, To, Message}, #state{oid = Oid,
 	{noreply, State};
 
 handle_cast({presence, Presence = #slim_presence{type=Type, nick=Nick, show=Show, status=Status}}, 
-	#state{oid = Oid, client=Client, rooms=Rooms} = State) ->
+	#state{oid = Oid, endpoint=Endpoint, rooms=Rooms} = State) ->
 
     Presence1 = 
     if 
     (Type == show) and (Show == invisible) ->
-        rooms_offline(Client, Rooms),
+        rooms_offline(Endpoint, Rooms),
         Presence#slim_presence{type=offline, show=unavailable};
     true ->
         Presence
@@ -444,13 +428,13 @@ handle_cast({presence, Presence = #slim_presence{type=Type, nick=Nick, show=Show
 		[] ->
 			?ERROR("updating show: ~p, route not found: ~p", [Show, Oid])
 		end,
-		{noreply, State#state{client = Client#slim_endpoint{nick=Nick, show=Show, status=Status}}};
+		{noreply, State#state{endpoint = Endpoint#slim_endpoint{nick=Nick, show=Show, status=Status}}};
 	true ->
 		{noreply, State}
 	end;
 
 %
-%handle_cast({update, Props}, State = #state{client = #slim_endpoint{show = Show}}) ->
+%handle_cast({update, Props}, State = #state{endpoint = #slim_endpoint{show = Show}}) ->
 %    case proplists:get_value(show, Props, Show) of
 %    Show -> ignore;
 %    Show1 -> 
@@ -467,76 +451,76 @@ handle_cast(Msg, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({dispatch, Packet}, State = #state{
-	client = #slim_endpoint{ oid = Oid }, subscribers = Subscribers}) ->
+	endpoint = #slim_endpoint{ oid = Oid }, clients = Clients}) ->
 	?INFO("~p Got Packet: ~n~p", [Oid, Packet]),
 	case Packet of	
 	%from group chat topic
 	#slim_message{from = Oid, type = grpchat} ->
 		ignore;
 	_ -> 
-		dispatch(Packet, Subscribers)
+		dispatch(Packet, Clients)
 	end,
     {noreply, State};
 
-handle_info({'DOWN', Mon, _Type, _Object, _Info}, #state{subscribers = Subscribers} = State) ->
-	case find_subscriber(Subscribers, Mon) of
-	{ok, Sub = #slim_subscriber{ticket = Ticket}} ->
+handle_info({'DOWN', Mon, _Type, _Object, _Info}, #state{clients = Clients} = State) ->
+	case find_client(Clients, Mon) of
+	{ok, Client = #slim_client{ticket = Ticket}} ->
 	   %?INFO("down: ~p, ~p",[Ticket, Mon]),
        Ref1 = 
-       case Sub#slim_subscriber.ref of
+       case Client#slim_client.ref of
        undefined -> send_after(?IDLE_TIMEOUT, self(), {idle_timeout, Ticket});
        Ref -> Ref
        end,
-       NewSub = Sub#slim_subscriber{spid = undefined, ref = Ref1, mon = undefined},
-       put(Ticket, NewSub);
+       NewClient = Client#slim_client{pid = undefined, ref = Ref1, mon = undefined},
+       put(Ticket, NewClient);
 	false ->
 		%?ERROR("cannot find down session: ~p", [Mon]),
 		ok
 	end,
 	{noreply, State};
 
-handle_info({idle_timeout, Ticket}, #state{subscribers = Subscribers} = State) ->
+handle_info({idle_timeout, Ticket}, #state{clients = Clients} = State) ->
 	?INFO("idle_timeout: ~p", [Ticket]),
     case get(Ticket) of
     undefined ->
         ?ERROR("assert failure: cannot idle_timeout ticket: ~p", [Ticket]);
-    Sub ->
+    Client ->
         %debug
         if
-        Sub#slim_subscriber.mon =/= undefined ->
-            ?ERROR("assert failure, subscriber mon: ~p", [Sub#slim_subscriber.mon]);
+        Client#slim_client.mon =/= undefined ->
+            ?ERROR("assert failure, subscriber mon: ~p", [Client#slim_client.mon]);
         true ->
             ok
         end,
         %debug
         if
-        Sub#slim_subscriber.spid =/= undefined ->
-            ?ERROR("assert failure, subscriber spid: ~p", [Sub#slim_subscriber.spid]);
+        Client#slim_client.pid =/= undefined ->
+            ?ERROR("assert failure, subscriber spid: ~p", [Client#slim_client.pid]);
         true ->
             ok
         end
     end,
 	erase(Ticket),
-	Subscribers1 = lists:delete(Ticket, Subscribers),
+	Clients1 = lists:delete(Ticket, Clients),
 	NewState = 
-	case length(Subscribers1) of
+	case length(Clients1) of
 	0 ->
 		Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
-		State#state{ref = Ref, subscribers = Subscribers1};
+		State#state{ref = Ref, clients = Clients1};
 	_ ->
-		State#state{subscribers = Subscribers1}	
+		State#state{clients = Clients1}	
 	end,
 	{noreply, NewState};
 
-handle_info(idle_timeout, #state{subscribers = Subscribers} = State) ->
-	case length(Subscribers) of
+handle_info(idle_timeout, #state{clients = Clients} = State) ->
+	case length(Clients) of
 	0 -> ok;
-	I -> ?ERROR("idle_timeout when ~p subscribers left", [I])
+	I -> ?ERROR("idle_timeout when ~p clients left", [I])
 	end,
 	{stop, normal, State};
 
 handle_info(stop, State) ->
-	?INFO("client received stop info", []),
+	?INFO("endpoint received stop info", []),
 	{stop, normal, State};
 
 handle_info(Info, State) ->
@@ -550,19 +534,19 @@ handle_info(Info, State) ->
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
 %%--------------------------------------------------------------------
-terminate(_Reason, #state{oid = Oid, client = Client, rooms = Rooms}) ->
+terminate(_Reason, #state{oid = Oid, endpoint = Endpoint, rooms = Rooms}) ->
 	Presence = #slim_presence{type = <<"offline">>, 
 						 from = Oid, 
-						 nick = Client#slim_endpoint.nick, 
+						 nick = Endpoint#slim_endpoint.nick, 
 					     show = <<"unavailable">>, 
-						 status = Client#slim_endpoint.status},
+						 status = Endpoint#slim_endpoint.status},
 	[slim_router:route(Oid, Buddy#slim_roster.fid, Presence) || 
 		Buddy <- slim_roster:buddies(Oid)],
 	slim_roster:remove(Oid),
 	slim_grpchat:leave(Oid, self()),
-    rooms_offline(Client, Rooms),
+    rooms_offline(Endpoint, Rooms),
     slim_router:unregister(Oid),
-    ?INFO("client is terminated: ~p",[Oid]),
+    ?INFO("endpoint is terminated: ~p",[Oid]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -572,28 +556,28 @@ terminate(_Reason, #state{oid = Oid, client = Client, rooms = Rooms}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-dispatch(Packet, Subscribers) ->
+dispatch(Packet, Clients) ->
     %% send Message to all the browsers of the receiver.
     %% slim_endpoint:dispatch -> slim_endpoint:handle_info(packet)
     %%                                              ||
     %%                                              ||
-    %% ReceiverClient <---LongPoll---> slim_jsonp <--
+    %% Receiver Endpoint <---LongPoll---> slim_jsonp <--
 	lists:foreach(fun(Ticket) -> 
 		case get(Ticket) of
-		Sub when is_record(Sub, slim_subscriber) ->
-			Packets = Sub#slim_subscriber.packets,
-			case Sub#slim_subscriber.spid of
+		Client when is_record(Client, slim_client) ->
+			Packets = Client#slim_client.packets,
+			case Client#slim_client.pid of
 			undefined ->
-				put(Ticket, Sub#slim_subscriber{packets = [Packet|Packets]});
+				put(Ticket, Client#slim_client{packets = [Packet|Packets]});
 			Pid ->
 				Pid ! {ok, [Packet|Packets]},
 				%TODO: fixme later, should be handled when unsubscribed?
 				if 
-				Sub#slim_subscriber.type == poll ->
-					erlang:demonitor(Sub#slim_subscriber.mon),
-					put(Ticket, Sub#slim_subscriber{spid=undefined, mon=undefined, packets=[]});
-				Sub#slim_subscriber.type == conn ->
-					put(Ticket, Sub#slim_subscriber{packets=[]});
+				Client#slim_client.type == poll ->
+					erlang:demonitor(Client#slim_client.mon),
+					put(Ticket, Client#slim_client{pid=undefined, mon=undefined, packets=[]});
+				Client#slim_client.type == conn ->
+					put(Ticket, Client#slim_client{packets=[]});
 				true ->
 					ignore
 				end
@@ -601,16 +585,16 @@ dispatch(Packet, Subscribers) ->
 		undefined ->
 			?ERROR("undefined subscriber in dict: ~p", [Ticket])
 		end
-	end, Subscribers).
+	end, Clients).
 
-find_subscriber([], _Mon) ->
+find_client([], _Mon) ->
 	false;
 
-find_subscriber([Ticket|Subscribers], Mon) ->
-	#slim_subscriber{mon = M} = Sub = get(Ticket),
+find_client([Ticket|Clients], Mon) ->
+	#slim_client{mon = M} = Client = get(Ticket),
 	if 
-	M == Mon -> {ok, Sub};
-	true -> find_subscriber(Subscribers, Mon)
+	M == Mon -> {ok, Client};
+	true -> find_client(Clients, Mon)
 	end.
 
 try_demonitor(undefined) -> ok;
@@ -618,4 +602,5 @@ try_demonitor(Mon) -> erlang:demonitor(Mon).
 
 cancel_timer(undefined) -> ok;
 cancel_timer(Ref) -> erlang:cancel_timer(Ref).
+
 

@@ -3,7 +3,8 @@
 -export([incr/2, decr/2]).
 
 incr(Meter, Domain) when is_atom(Meter) and is_binary(Domain) ->
-    ok;
+    ok.
+
 decr(Meter, Domain) when is_atom(Meter) and is_binary(Domain) ->
-    ok;
+    ok.
 

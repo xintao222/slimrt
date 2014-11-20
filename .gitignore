@@ -4,6 +4,8 @@ apps/cowboy
 apps/cowlib
 apps/ranch
 apps/ranch
+apps/lager
+apps/goldrush
 rel/slimrt
 *.o
 *.beam

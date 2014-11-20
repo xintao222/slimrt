@@ -24,7 +24,7 @@
 
 -author('feng.lee@slimchat.io').
 
--include("slim_api.hrl").
+-include("slim_log.hrl").
 
 -export([init/2,
 		 websocket_handle/3,
@@ -35,19 +35,16 @@ init(Req, Opts) ->
 	{cowboy_websocket, Req, Opts, hibernate}.
 
 % 
-%% subscribe ${domain} %{ticket}
+%% subscribe %{ticket}
 %
-websocket_handle({text, <<"subscribe ", Msg/binary>>}, Req, State) ->
-	[Domain, STicket] = binary:split(Msg, [<<" ">>]),
-    Ticket = #slim_ticket{class=Class, name=Name}
-		= slim_ticket:make(STicket),
-	UserOid = slim_oid:make(Class, Domain, Name),
-	case slim_router:lookup(UserOid) of
-	[Route] ->
-		slim_endpoint:subscribe(Route#slim_route.pid, Ticket, self()),
-		{reply, {text, slim_json:pack([])}, Req, State, hibernate};
-	[] ->
-		?ERROR("client not found, ticket: ~p", [Ticket]),
+websocket_handle({text, <<"subscribe ", STicket/binary>>}, Req, State) ->
+    Ticket = slim_ticket:make(STicket),
+	case slim_cm:lookup(Ticket) of
+	Pid when is_pid(Pid) ->
+		slim_client:subscribe(Pid, Ticket),
+		Json = slim_json:encode([{status, ok}]),
+		{reply, {text, Json}, Req, State, hibernate};
+	undefined ->
 		{shutdown, Req, State}
 	end;
 
@@ -55,11 +52,11 @@ websocket_handle({pong, _}, Req, State) ->
 	{ok, Req, State, hibernate};
 	
 websocket_handle(Data, Req, State) ->
-	%?ERROR("bad data: ~p", [Data]),
+	?ERROR("badata: ~p", [Data]),
 	{shutdown, Req, State}.
 
 websocket_info({ok, Packets}, Req, State) ->
-	JSON = slim_json:pack(lists:reverse(Packets)),
+	JSON = slim_json:pack(Packets),
 	{reply, {text, JSON}, Req, State};
 
 websocket_info(stop, Req, State) ->

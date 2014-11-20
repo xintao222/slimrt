@@ -64,22 +64,11 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-
 %%
 %% @doc Start Pubsub.
 %%
--spec start_link() -> {ok, pid()}.
 start_link() ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-%%
-%% @doc Topic Count
-%%
--spec count() -> non_neg_integer().
-count() ->
-	mnesia:table_info(topic, size).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%
 %% @doc All topics
@@ -174,9 +163,6 @@ handle_cast({unsubscribe, Topic, SubPid}, State) ->
 
 handle_cast(Msg, State) ->
 	{stop, {badmsg, Msg}, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
 
 handle_info({'DOWN', Mon, _Type, _Object, _Info}, State) ->
 	case get({submon, Mon}) of

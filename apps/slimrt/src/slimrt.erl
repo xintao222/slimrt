@@ -22,6 +22,10 @@
 
 -module(slimrt).
 
+-author('feng.lee@slimchat.io').
+
+-include("slim_log.hrl").
+
 %% API.
 -export([start/0]).
 

@@ -20,7 +20,7 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
--module(slimrt_roster).
+-module(slim_roster).
 
 -include_lib("slimpp/include/slimpp.hrl").
 
@@ -34,7 +34,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0
+-export([start_link/0,
          buddies/1,
          add/2,
          remove/1]).

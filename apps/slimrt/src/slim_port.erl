@@ -25,6 +25,7 @@
 -author('feng.lee@slimchat.io').
 
 -export([open/3,
+		 isopened/1,
 		 addr/1]).
 
 %SockOpts = [binary,
@@ -40,7 +41,7 @@ open(Name, Module, Opts) ->
 	%?PRINT("Mqttd is listening on ~p~n", [proplists:get_value(port, Opts)]),
 	{ok, Listener}.
 
-isopened(Name) ->
+isopened(_Name) ->
 	true.
 
 %TODO:   
