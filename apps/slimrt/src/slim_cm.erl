@@ -23,6 +23,8 @@
 %client manager
 -module(slim_cm).
 
+-author('feng.lee@slimchat.io').
+
 -include_lib("slimpp/include/slimpp.hrl").
 
 -behaviour(gen_server).
@@ -62,14 +64,14 @@ lookup(Ticket) when ?is_ticket(Ticket) ->
 	[] -> undefined
 	end.
 
-create(Ticket, Oid) when ?is_ticket(Ticket) and ?is_oid(Oid) ->
-	ets:insert(slim_client, {Ticket, Oid}).
+create(Ticket, Endpoint) when ?is_ticket(Ticket) and is_pid(Endpoint) ->
+	ets:insert(slim_client, {Ticket, Endpoint}).
 
 destroy(Ticket) when ?is_ticket(Ticket) ->
 	ets:delete(slim_client, Ticket);
 
-destroy(Pid) when is_pid(Pid) ->
-	ets:match_delete(slim_client, {{'_', Pid}}).
+destroy(Endpoint) when is_pid(Endpoint) ->
+	ets:match_delete(slim_client, {{'_', Endpoint}}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions

@@ -8,9 +8,7 @@ deps:
 
 clean:
 	./rebar clean
-
-generate:
-	./rebar generate -f
-
-relclean:
 	rm -rf rel/slimrt
+
+dist:
+	cd rel && ../rebar generate -f

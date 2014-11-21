@@ -64,7 +64,7 @@ handle(Req, _Opts) ->
 		{ok, reply(error, Req, 400, <<"Bad Path">>)}
 	end.
 
-handle(Req, <<"POST">>, <<"/clients/online">>) ->
+handle(Req, <<"POST">>, <<"/presences/online">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Domain = get_value(<<"domain">>, Params),
     {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
@@ -76,7 +76,7 @@ handle(Req, <<"POST">>, <<"/clients/online">>) ->
 		reply(ok, Req1, Code, Reason)
 	end;
 
-handle(Req, <<"POST">>, <<"/clients/offline">>) ->
+handle(Req, <<"POST">>, <<"/presences/offline">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	slim_client:offline(Ticket, Params),
@@ -98,9 +98,9 @@ handle(Req, <<"POST">>, <<"/messages/send">>) ->
 	Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	case slim_client:send_message(Ticket, Params) of
 	ok ->
-		reply(ok, Req, 200);
+		reply(ok, Req1, 200);
 	{error, Reason} ->
-		reply(error, Req, 500, Reason)
+		reply(error, Req1, 500, Reason)
 	end;
 
 handle(Req, <<"POST">>, <<"/messages/push">>) ->
@@ -110,9 +110,9 @@ handle(Req, <<"POST">>, <<"/messages/push">>) ->
 	FromOid = slim_oid:make(FromCls, Domain, From),
 	case slim_client:push_message(FromOid, Params) of
 	ok ->
-		reply(ok, Req, 200);
+		reply(ok, Req1, 200);
 	{error, Reason} ->
-		reply(error, Req, 500, Reason)
+		reply(error, Req1, 500, Reason)
 	end;
 
 handle(Req, <<"POST">>, <<"/rooms/join">>) ->
@@ -143,7 +143,4 @@ reply(error, Req, Code, Reason) ->
 	Json = slim_json:encode([{status, error}, {reason, Reason}]),
 	{ok, Reply} = cowboy_req:reply(Code, [], Json, Req),
 	Reply.
-
-makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
-	slim_oid:make(Cls, Domain, Name).
 

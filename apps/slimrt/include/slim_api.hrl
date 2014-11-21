@@ -24,8 +24,8 @@
 
 %%TODO: FIXME Later
 -define(SLIM_HTTP_APIS, [
-	"/clients/online",
-	"/clients/offline",
+	"/presences/online",
+	"/presences/offline",
 	"/presences/set",
 	"/presences",
 	"/messages/send",
@@ -37,9 +37,9 @@
 	
 
 %jsonp long poll
--define(SLIM_JSONP_API, <<"/packets">>).
+-define(SLIM_JSONP_API, "/packets").
 
 %websocket long connect
--define(SLIM_WSOCKET_API, <<"/wsocket">>).
+-define(SLIM_WSOCKET_API, "/wsocket").
 
 

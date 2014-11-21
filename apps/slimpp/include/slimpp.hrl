@@ -66,6 +66,8 @@
 
 -type message() :: #slim_message{}.
 
+-define(is_message(Record), is_record(Record, slim_message)).
+
 %%------------------------------------------------------------------------------
 %% slim presence
 %%------------------------------------------------------------------------------
@@ -84,6 +86,8 @@
 }).
 
 -type presence() :: #slim_presence{}.
+
+-define(is_presence(Record), is_record(Record, slim_presence)).
 
 %%------------------------------------------------------------------------------
 %% slim ticket

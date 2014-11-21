@@ -47,15 +47,22 @@ online(FromOid, Params) ->
     Buddies = parse(buddies, Domain, Params),
 	Rooms = parse(rooms, Domain, Params),
 
-    {ok, CPid} =
+    {ok, Endpoint} =
     case slim_router:lookup(FromOid) of
     [] ->
-        slim_endpoint_sup:start_child({FromOid, Buddies, Rooms});
-		%%FIXME Later: slim_endpoint:send(#slim_presence{});
+		%%TODO: is ok???
+        {ok, Pid} = slim_endpoint_sup:start_child({FromOid, Buddies, Rooms}),
+		slim_endpoint:send(#slim_presence{
+			type = online, 
+			nick = Nick, 
+			from = FromOid, 
+			show = Show, 
+			status = Status});
     [Route = #slim_route{pid=Pid, show = OldShow}] ->
 		%在线支持好友关系问题
-		slim_endpoint:update(Pid, {buddies, Buddies1}),
-		slim_endpoint:update(Pid, {rooms, Rooms1}),
+		%%FIXME: 不合理....
+		slim_endpoint:update(Pid, {buddies, Buddies}),
+		slim_endpoint:update(Pid, {rooms, Rooms}),
         %TODO: should update rooms
         if
             Show == OldShow -> ignore;
@@ -64,7 +71,7 @@ online(FromOid, Params) ->
         {ok, Route#slim_route.pid}
     end,
 
-	{ok, Ticket} = slim_endpoint:bind(Endpoint);
+	{ok, Ticket} = slim_endpoint:bind(Endpoint),
 	Response = [{ticket, slim_ticket:encode(Ticket)},
                 {server, slim_port:addrs()}],
 
@@ -122,14 +129,17 @@ send_message(Ticket, Params) ->
 		{error, "Client Not Found"}
 	end.
 
+makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
+	slim_oid:make(Cls, Domain, Name).
+
 makeoid(Domain, Type, Name) ->
 	%%FIXME:......
-	{Tag, To} = slim_id:parse(get_value(<<"to">>, Params)),
+	{Tag, Id} = slim_id:parse(Name),
 	case Type of
 	<<"chat">> -> 
-		slim_oid:make(Tag, Domain, To);
+		slim_oid:make(Tag, Domain, Id);
 	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, To)
+		slim_oid:make(gid, Domain, Id)
 	end.
 
 push_message(FromOid, Params) ->
@@ -173,6 +183,6 @@ parse(buddies, Domain, Params) ->
 parse(rooms, Domain, Params) ->
     Rooms = get_value(<<"rooms">>, Params, <<>>),
     [slim_oid:make(gid, Domain, Room) 
-		|| Room <- bsplit(Rooms, <<",">>)];
+		|| Room <- bsplit(Rooms, <<",">>)].
 
 

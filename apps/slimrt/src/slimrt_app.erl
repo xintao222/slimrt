@@ -22,6 +22,8 @@
 
 -module(slimrt_app).
 
+-include("slim_log.hrl").
+
 -behaviour(application).
 
 %% Application callbacks
@@ -30,9 +32,71 @@
 %% ===================================================================
 %% Application callbacks
 %% ===================================================================
-
 start(_StartType, _StartArgs) ->
-    slimrt_sup:start_link().
+	print_banner(),
+	{ok, Sup} = slimrt_sup:start_link(),
+	start_services(Sup),
+	slim_httpd:start(env(httpd)),
+    %start mqtt
+    MqttEnv = env(mqttd),
+    case proplists:get_value(open, MqttEnv, false) of
+    true -> slim_mqttd:start(MqttEnv);
+    false -> ignore
+    end,
+	print_vsn(),
+	{ok, Sup}.
+
+env(Key) ->
+	{ok, Opts} = application:get_env(Key), Opts.
+
+print_banner() ->
+	todo.
+
+print_vsn() ->
+	{ok, Vsn} = application:get_key(vsn),
+	{ok, Desc} = application:get_key(description),
+	?PRINT("~s ~s is running now~n", [Desc, Vsn]).
+
+start_services(Sup) ->
+	lists:foreach(
+        fun({Name, F}) when is_function(F) ->
+			?PRINT("~s is starting...", [Name]),
+            F(),
+			?PRINT_MSG("[done]~n");
+		   ({Name, Server}) when is_atom(Server) ->
+			?PRINT("~s is starting...", [Name]),
+			start_child(Sup, Server),
+			?PRINT_MSG("[done]~n");
+           ({Name, Server, Opts}) when is_atom(Server) ->
+			?PRINT("~s is starting...", [ Name]),
+			start_child(Sup, Server, Opts),
+			?PRINT_MSG("[done]~n")
+		end,
+	 	[{"Slim PubSub", slim_pubsub},
+         {"Slim Router", slim_router},
+         %{"Slim Auth", nextalk_auth},
+		 {"Slim Roster", slim_roster},
+		 {"Slim GrpChat", slim_grpchat},
+		 {"Slim Monitor", slimrt_monitor},
+		 {"Slim Endpoint Supervisor", fun() -> 
+            Name = slim_endpoint_sup,
+            supervisor:start_child(Sup,
+                {Name, {Name, start_link, []}, 
+                    permanent, 10, supervisor, [Name]})
+         end}
+		]).
+
+start_child(Sup, Name) ->
+    {ok, _ChiId} = supervisor:start_child(Sup, worker_spec(Name)).
+start_child(Sup, Name, Opts) ->
+    {ok, _ChiId} = supervisor:start_child(Sup, worker_spec(Name, Opts)).
+
+worker_spec(Name) ->
+    {Name, {Name, start_link, []}, 
+        permanent, 5000, worker, [Name]}.
+worker_spec(Name, Opts) ->
+    {Name, {Name, start_link, [Opts]}, 
+        permanent, 5000, worker, [Name]}.
 
 stop(_State) ->
     ok.
