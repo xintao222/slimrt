@@ -33,6 +33,7 @@ run(I, Max) ->
     inets:start(httpc, [{profile, Profile}, {timeout, 120000}]),
     case httpc:request(post, Request, [{timeout, 30000}], [], Profile) of
     {ok, {_Status, _Headers, Resp}} ->
+		io:format("~s~n", [Resp]),
         {struct, JSON} = mochijson2:decode(Resp),
         io:format("start loop ~p ~n", [I]),
         spawn(fun() -> loop(JSON, Profile) end);

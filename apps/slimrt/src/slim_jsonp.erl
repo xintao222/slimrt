@@ -57,13 +57,11 @@ init(Req, Opts) ->
 
 info({ok, Packets}, Req, State = #state{callback=CB}) ->
 	JSON = slim_packet:encode(Packets),
-	{ok, Reply} = reply(CB, JSON, Req),
-    {ok, Reply, State};
+    {ok, reply(CB, JSON, Req), State};
  
 info(stop, Req, State = #state{callback=CB}) ->
 	JSON = slim_json:encode([{status, stopped}]),
-	{ok, Reply} = reply(CB, JSON, Req),
-    {ok, Reply, State};
+    {ok, reply(CB, JSON, Req), State};
 
 info(Message, Req, State) ->
 	?ERROR("badmsg: ~p", [Message]),
