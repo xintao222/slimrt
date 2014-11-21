@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [ $# -ne 1 ]; then
+    echo "Usage: ./run num"
+    exit 1
+fi
+
+erl -pa ebin -env ERL_MAX_ETS_TABLES 10000 -env ERL_MAX_PORTS 10000  -s slimrt_test start $1
