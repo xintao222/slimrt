@@ -78,6 +78,7 @@ start_services(Sup) ->
 		 {"Slim Roster", slim_roster},
 		 {"Slim GrpChat", slim_grpchat},
 		 {"Slim Monitor", slimrt_monitor},
+         {"Slim Client Manager", slim_cm},
 		 {"Slim Endpoint Supervisor", fun() -> 
             Name = slim_endpoint_sup,
             supervisor:start_child(Sup,

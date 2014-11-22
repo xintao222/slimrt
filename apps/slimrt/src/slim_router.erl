@@ -28,6 +28,8 @@
 
 -include("slimrt.hrl").
 
+-include("slim_log.hrl").
+
 -behaviour(gen_server).
 
 -define(SERVER, ?MODULE).
@@ -124,10 +126,11 @@ route(_From, To, Packet) ->
 
 init(_Args) ->
 	process_flag(trap_exit, true),
-	mnesia:create_table(slim_route,
+	Res = mnesia:create_table(slim_route,
 		[{ram_copies, [node()]},
 		 {attributes, record_info(fields, slim_route)},
 		 {index, [mon]}]),
+	?INFO("~p", [Res]),
 	mnesia:add_table_copy(slim_route, node(), ram_copies),
     {ok, state}.
 

@@ -48,7 +48,7 @@ init(Req, Opts) ->
 
 authorized(Req) ->
     case cowboy_req:parse_header(<<"authorization">>, Req) of
-    {ok, {<<"basic">>, {Domain, ApiKey}}} ->
+    {<<"basic">>, {Domain, ApiKey}} ->
         case slim_auth:check(Domain, ApiKey) of
         true -> true;
         {error, Error} -> {false, Error}
@@ -69,6 +69,7 @@ handle(Req, _Opts) ->
 
 handle(Req, <<"POST">>, <<"/presences/online">>) ->
 	{ok, Params, Req1} = cowboy_req:body_qs(Req),
+	?INFO("online: ~p", [Params]),
     Domain = get_value(<<"domain">>, Params),
     {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
     FromOid = slim_oid:make(Class, Domain, Name),
