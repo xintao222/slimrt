@@ -36,7 +36,7 @@ start(_StartType, _StartArgs) ->
 	print_banner(),
 	{ok, Sup} = slimrt_sup:start_link(),
 	start_services(Sup),
-	slim_httpd:start(env(httpd)),
+	slim_http:start(env(httpd)),
     %start mqtt
     MqttEnv = env(mqttd),
     case proplists:get_value(open, MqttEnv, false) of

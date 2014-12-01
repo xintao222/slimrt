@@ -15,7 +15,6 @@
 			slim_endpoint_sup,
 			slim_grpchat,
 			slim_http,
-			slim_httpd,
 			slim_jsonp,
 			slim_meter,
 			slim_mqtt,
