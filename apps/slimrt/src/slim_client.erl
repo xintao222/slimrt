@@ -52,12 +52,13 @@ online(FromOid, Params) ->
     [] ->
 		%%TODO: is ok???
         {ok, Pid} = slim_endpoint_sup:start_child({FromOid, Buddies, Rooms}),
-		slim_endpoint:send(#slim_presence{
+		slim_endpoint:send(Pid, #slim_presence{
 			type = online, 
 			nick = Nick, 
 			from = FromOid, 
 			show = Show, 
-			status = Status});
+			status = Status}),
+		{ok, Pid};
     [Route = #slim_route{pid=Pid, show = OldShow}] ->
 		%在线支持好友关系问题
 		%%FIXME: 不合理....

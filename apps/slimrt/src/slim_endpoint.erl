@@ -477,7 +477,7 @@ handle_info({idle_timeout, Ticket}, #state{clients = Clients} = State) ->
     end,
 	erase(Ticket),
 	Clients1 = lists:delete(Ticket, Clients),
-	slim_cm:destory(Ticket),
+	slim_cm:destroy(Ticket),
 	NewState = 
 	case length(Clients1) of
 	0 ->
@@ -516,7 +516,7 @@ terminate(_Reason, #state{oid = Oid}) ->
 					     show = <<"unavailable">>},
 	[slim_router:route(Oid, Buddy#slim_roster.fid, Presence) || 
 		Buddy <- slim_roster:buddies(Oid)],
-	slim_cm:destory(self()),
+	slim_cm:destroy(self()),
 	slim_roster:remove(Oid),
 	slim_grpchat:leave(Oid, self()),
     slim_router:unregister(Oid),
