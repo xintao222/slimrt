@@ -27,7 +27,7 @@ run(I, Max) ->
         {"rooms", string:join(Rooms, ",")}
     ],
     Body = string:join([lists:concat([K, "=", V]) || {K, V} <- Params], "&"),
-    Request = {?SERVER ++ "/presences/online", headers(), "application/x-www-form-urlencoded", Body},
+    Request = {?SERVER ++ "/online", headers(), "application/x-www-form-urlencoded", Body},
     io:format("~p~n", [Request]),
     Profile = profile(I),
     inets:start(httpc, [{profile, Profile}, {timeout, 120000}]),
@@ -44,11 +44,14 @@ run(I, Max) ->
     run(I-1, Max).
 
 loop(JSON, Profile) ->
-    Server = binary_to_list(proplists:get_value(<<"jsonpd">>, JSON)),
-    Ticket = binary_to_list(proplists:get_value(<<"ticket">>, JSON)),
+	io:format("~p~n", [JSON]),
+	{struct, Data} = proplists:get_value(<<"data">>, JSON),
+    {struct, Server} = proplists:get_value(<<"server">>, Data),
+	Jsonp = binary_to_list(proplists:get_value(<<"jsonp">>, Server)),
+    Ticket = binary_to_list(proplists:get_value(<<"ticket">>, Data)),
     Params = [{"domain", ?DOMAIN}, {"ticket", Ticket}],
     Query = string:join([lists:concat([K, "=", V]) || {K, V} <- Params], "&"),
-    Url = Server ++ "?" ++ Query,
+    Url = Jsonp ++ "?" ++ Query,
     io:format("poll: ~s~n", [Ticket]),
     case httpc:request(Url, Profile) of
     {error, Reason} ->

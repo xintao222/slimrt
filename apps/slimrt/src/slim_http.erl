@@ -59,7 +59,10 @@ handle(Req) ->
 		Req:respond({404, [], "Bad Request"})
 	end.
 
-handle('POST', "/presences/online", Req) ->
+%%------------------------------------------------------------------------------
+%% HTTP API 
+%%------------------------------------------------------------------------------
+handle('POST', "/online", Req) ->
 	Params = params(post, Req), 
 	?INFO("online: ~p", [Params]),
     Domain = get_value(<<"domain">>, Params),
@@ -72,13 +75,14 @@ handle('POST', "/presences/online", Req) ->
 		reply(Code, Reason, Req)
 	end;
 
-handle('POST', "/presences/offline", Req) ->
+handle('POST', "/offline", Req) ->
 	Params = params(post, Req),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	slim_client:offline(Ticket, Params),
 	reply(200, Req);
 
-handle('POST', "/presences/update", Req) ->
+handle('POST', "/presences", Req) ->
+	%% update presences??
 	%TODO: ....
 	reply(200, Req);
 
@@ -117,13 +121,14 @@ handle('POST', "/rooms/join", Req) ->
 handle('POST', "/rooms/leave", Req) ->
 	reply(200, Req);
 
-handle('POST', "/rooms/members", Req) ->
+handle('GET', "/rooms/members", Req) ->
 	reply(200, Req);
 
+%%------------------------------------------------------------------------------
+%% Long Polling
+%%------------------------------------------------------------------------------
 handle('GET', "/packets", Req) ->
-	%%TODO:......
-	timer:sleep(1000),
-	reply(200, Req);
+	slim_jsonp:handle(params(get, Req), Req);
 
 handle(_Method, _Path, Req) ->
 	reply(400, <<"Bad Request">>, Req).

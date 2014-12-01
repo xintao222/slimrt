@@ -30,61 +30,52 @@
 
 -include("slim_log.hrl").
 
--import(lists, [reverse/1]).
+-export([handle/2]).
 
--import(proplists, [get_value/2, get_value/3]).
+-export([polling/2]).
 
--export([init/2, info/3, terminate/3]).
+-record(state, {callback = <<>>, ticket, endpoint, timer}).
 
--record(state, {callback = <<>>, ticket, endpoint}).
-
-init(Req, Opts) ->
-	?INFO("Json handler opts: ~p", [Opts]),
-	{ok, Params, Req1} = cowboy_req:qs_vals(Req),
+handle(Params, Req) ->
 	?INFO("Jsonp request: ~p", [Params]),
-    Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+    Ticket = slim_ticket:make(proplists:get_value(<<"ticket">>, Params)),
 	case slim_cm:lookup(Ticket) of
 	Pid when is_pid(Pid) ->
 		slim_client:subscribe(Pid, Ticket),
-		Callback = get_value(<<"callback">>, Params, <<>>), 
-		State = #state{callback = Callback, ticket = Ticket, endpoint = Pid},
-		{cowboy_loop, Req1, State, ?POLL_TIMEOUT, hibernate};
+		Callback = proplists:get_value(<<"callback">>, Params, <<>>), 
+		Ref = erlang:send_after(?POLL_TIMEOUT, self(), timeout),
+		State = #state{callback = Callback, ticket = Ticket, endpoint = Pid, timer = Ref},
+		proc_lib:hibernate(?MODULE, polling, [Req, State]);
 	undefined -> 
-		JSON = slim_json:encode([{status, <<"stopped">>}, {error, "Ticket not bound"}]),
-		{ok, Reply} = cowboy_req:reply(404, [], JSON, Req1),
-		{shutdown, Reply, #state{}}
+		JSON = slim_json:encode([{status, <<"stopped">>}, {error, <<"Ticket not bound">>}]),
+		Req:respond({404, [], JSON})
 	end.
 
-info({ok, Packets}, Req, State = #state{callback=CB}) ->
-	JSON = slim_packet:encode(Packets),
-    {ok, reply(CB, JSON, Req), State};
- 
-info(stop, Req, State = #state{callback=CB}) ->
-	JSON = slim_json:encode([{status, stopped}]),
-    {ok, reply(CB, JSON, Req), State};
-
-info(Message, Req, State) ->
-	?ERROR("badmsg: ~p", [Message]),
-    {loop, Req, State, hibernate}.
-
-%%FIXME LATER
-%%timeout(Req, State = #state{callback=CB}) ->
-%%	JSON = slim_packet:encode([]),
-%%	Reply =	replyok(CB, JSON, Req),
-%%	{ok, Reply, State}.
-%%
- 
-terminate(_Reason, _Req, #state{endpoint = undefined}) ->
-	ok;
-terminate(_Reason, _Req, #state{ticket = Ticket, endpoint = Pid}) ->
-	slim_client:unsubscribe(Pid, Ticket). 
+polling(Req, #state{callback = CB, ticket = Ticket, endpoint = Pid, timer = Ref}) ->
+	?INFO_MSG("polling......"),
+	erlang:cancle_timer(Ref),
+	slim_client:unsubscribe(Pid, Ticket),
+	receive
+		{ok, Packets} ->
+			JSON = slim_packet:encode(Packets),
+			reply(CB, JSON, Req);
+		stop ->
+			JSON = slim_json:encode([{status, stopped}]),
+			reply(CB, JSON, Req);
+		timeout ->
+			?ERROR("polling timeout... ~p", [Ticket]),
+			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req);
+		Other->
+			?ERROR("polling got: ~p", [Other]),
+			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
+	end.
 
 reply(<<>>, JSON, Req) ->
 	Headers = [{"Content-Type", "application/json"}],
-	cowboy_req:reply(200, Headers, JSON, Req);
+	Req:respond({200, Headers, JSON});
 
 reply(CB, JSON, Req) ->
 	Headers = [{"Content-Type", "application/javascript"}],
     JS = list_to_binary([CB, "(", JSON, ")"]),
-	cowboy_req:reply(200, Headers, JS, Req).
+	Req:respond({200, Headers, JS}).
 

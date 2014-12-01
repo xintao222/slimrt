@@ -34,6 +34,8 @@
 
 -export([online/2, offline/2]).
 
+-export([subscribe/2, unsubscribe/2]).
+
 online(FromOid, Params) ->
 	%domain
     Domain = get_value(<<"domain">>, Params),
@@ -72,17 +74,20 @@ online(FromOid, Params) ->
         {ok, Route#slim_route.pid}
     end,
 
-	{ok, Ticket} = slim_endpoint:bind(Endpoint),
+	%%TODO:...
+	{ok, Ticket} = slim_endpoint:bind(Endpoint, <<"clientId">>),
 	Response = [{ticket, slim_ticket:encode(Ticket)},
                 {server, slim_port:addrs()}],
 
 	%response
+	Response1 = 
     case presences(Buddies) of
-    [ ] ->
+    {ok, []} ->
 		[{presences, {}} | Response];
-    Presences ->
+    {ok, Presences} ->
 		[{presences, Presences} | Response]
-    end.
+    end,
+	{ok, Response1}.
 
 offline(Ticket, Params) ->
 	case slim_climgr:lookup(Ticket) of
@@ -100,7 +105,7 @@ presences(Domain, Ids) when is_list(Ids) ->
 	presences(Oids).
 
 presences(Oids) when is_list(Oids) ->
-	[ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} <- slim_router:lookup(Oids) ].
+	{ok, [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} <- slim_router:lookup(Oids) ]}.
 
 set_presence(Params) ->
     ok.

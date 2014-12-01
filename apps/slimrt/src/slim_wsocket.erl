@@ -62,7 +62,7 @@ websocket_info({ok, Packets}, Req, State) ->
 websocket_info(stop, Req, State) ->
 	{shutdown, Req, State};
 
-websocket_info(Info, Req, State) ->
+websocket_info(_Info, Req, State) ->
 	{shutdown, Req, State}.
 
 websocket_terminate(_Reason, _Req, _State) ->

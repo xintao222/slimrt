@@ -60,7 +60,7 @@ start_link() ->
 
 lookup(Ticket) when ?is_ticket(Ticket) ->
 	case ets:lookup(slim_client, Ticket) of
-	[Pid] -> Pid;
+	[{_, Pid}] -> Pid;
 	[] -> undefined
 	end.
 

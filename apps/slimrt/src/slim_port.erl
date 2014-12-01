@@ -47,8 +47,7 @@ isopened(_Name) ->
 
 %%SHOULD be moved to slimrt.erl
 addrs() ->
-	[{Name, addr(Name)} || Name <- [jsonpd, websocket]].
-
+	[{Name, addr(Name)} || Name <- [jsonp, wsocket]].
 
 
 %TODO:   
