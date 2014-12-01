@@ -117,7 +117,12 @@ handle('POST', "/rooms/join", Req) ->
 handle('POST', "/rooms/leave", Req) ->
 	reply(200, Req);
 
-handle(Req, <<"POST">>, <<"/rooms/members">>) ->
+handle('POST', "/rooms/members", Req) ->
+	reply(200, Req);
+
+handle('GET', "/packets", Req) ->
+	%%TODO:......
+	timer:sleep(1000),
 	reply(200, Req);
 
 handle(_Method, _Path, Req) ->

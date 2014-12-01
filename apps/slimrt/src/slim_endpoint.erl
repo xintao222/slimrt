@@ -152,13 +152,14 @@ leave(Pid, Gid, Nick) when ?is_oid(Gid) ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([{Oid, Nick, Buddies, Rooms}]) ->
+init([{Oid, Buddies, Rooms}]) ->
     process_flag(trap_exit, true),
 	add_buddies(Oid, Buddies),
-	join_rooms(Oid, Nick, Rooms),
+	%%FIXME: nick....
+	join_rooms(Oid, "Nick", Rooms),
 	register_route(Oid),
 	Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
-    {ok, #state{oid = Oid, nick = Nick, ref = Ref}}.
+    {ok, #state{oid = Oid, nick = "Nick", ref = Ref}}.
 
 add_buddies(ThisOid, Buddies) ->
 	%%TODO: Only onlines???
