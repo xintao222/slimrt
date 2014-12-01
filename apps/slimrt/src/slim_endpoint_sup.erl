@@ -36,7 +36,7 @@ start_child({Endpoint, Buddies, Rooms}) ->
 
 init([]) ->
     {ok, {{simple_one_for_one, 3, 1},
-          [{undefined, {slim_endpoint, start_link, []},
+          [{endpoint, {slim_endpoint, start_link, []},
               transient, 10, worker, [slim_endpoint]}]}}.
 
 

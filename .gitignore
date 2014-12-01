@@ -1,9 +1,7 @@
 .eunit
 deps
-apps/cowboy
-apps/cowlib
-apps/ranch
-apps/ranch
+apps/mochiweb
+apps/esockd
 apps/lager
 apps/goldrush
 rel/slimrt

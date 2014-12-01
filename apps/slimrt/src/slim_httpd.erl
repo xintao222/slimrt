@@ -42,9 +42,10 @@ start(Opts) ->
 			| [ Handler(API) || API <- ?SLIM_HTTP_APIS ]
 		]}
 	]),
+	cowboy:start_http(test_http, 2, [{port, 8088}], []),
 	%% Name, NbAcceptors, TransOpts, ProtoOpts
 	HttpdPid = 
-	case cowboy:start_http(?MODULE, 100, Opts, [{env, [{dispatch, Dispatch}]}]) of
+	case cowboy:start_http(?MODULE, 2, Opts, [{env, [{dispatch, Dispatch}]}]) of
     {ok, Pid} -> Pid;
     {error,{already_started, Pid}} -> Pid
     end,
