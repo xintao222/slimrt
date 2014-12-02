@@ -40,8 +40,8 @@ start(_StartType, _StartArgs) ->
     %start mqtt
     MqttEnv = env(mqttd),
     case proplists:get_value(open, MqttEnv, false) of
-    true -> slim_mqttd:start(MqttEnv);
-    false -> ignore
+    true -> slim_mqtt:start(MqttEnv);
+    false -> ok
     end,
 	print_vsn(),
 	{ok, Sup}.
