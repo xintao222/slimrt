@@ -1,9 +1,5 @@
 .eunit
 deps
-apps/mochiweb
-apps/esockd
-apps/lager
-apps/goldrush
 rel/slimrt
 *.o
 *.beam
