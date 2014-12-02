@@ -44,7 +44,6 @@ run(I, Max) ->
     run(I-1, Max).
 
 loop(JSON, Profile) ->
-	io:format("~p~n", [JSON]),
 	{struct, Data} = proplists:get_value(<<"data">>, JSON),
     {struct, Server} = proplists:get_value(<<"server">>, Data),
 	Jsonp = binary_to_list(proplists:get_value(<<"jsonp">>, Server)),

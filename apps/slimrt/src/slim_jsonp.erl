@@ -34,7 +34,7 @@
 
 -export([polling/2]).
 
--record(state, {callback = <<>>, ticket, endpoint, timer}).
+-record(state, {callback = <<>>, ticket, endpoint}).
 
 handle(Params, Req) ->
 	?INFO("Jsonp request: ~p", [Params]),
@@ -43,39 +43,37 @@ handle(Params, Req) ->
 	Pid when is_pid(Pid) ->
 		slim_client:subscribe(Pid, Ticket),
 		Callback = proplists:get_value(<<"callback">>, Params, <<>>), 
-		Ref = erlang:send_after(?POLL_TIMEOUT, self(), timeout),
-		State = #state{callback = Callback, ticket = Ticket, endpoint = Pid, timer = Ref},
-		proc_lib:hibernate(?MODULE, polling, [Req, State]);
+		State = #state{callback = Callback, ticket = Ticket, endpoint = Pid},
+		polling(Req, State);
 	undefined -> 
 		JSON = slim_json:encode([{status, <<"stopped">>}, {error, <<"Ticket not bound">>}]),
 		Req:respond({404, [], JSON})
 	end.
 
-polling(Req, #state{callback = CB, ticket = Ticket, endpoint = Pid, timer = Ref}) ->
-	?INFO_MSG("polling......"),
-	erlang:cancle_timer(Ref),
-	slim_client:unsubscribe(Pid, Ticket),
+%%FIXME Later...
+polling(Req, #state{callback = CB, ticket = Ticket, endpoint = Pid}) ->
+    Response = 
 	receive
 		{ok, Packets} ->
-			JSON = slim_packet:encode(Packets),
-			reply(CB, JSON, Req);
+            ?INFO("packets: ~p", [Packets]),
+			reply(CB, slim_packet:encode(Packets), Req);
 		stop ->
-			JSON = slim_json:encode([{status, stopped}]),
-			reply(CB, JSON, Req);
-		timeout ->
-			?ERROR("polling timeout... ~p", [Ticket]),
-			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req);
+            ?INFO_MSG("stop..."),
+			reply(CB, slim_json:encode([{status, stopped}]), Req);
 		Other->
 			?ERROR("polling got: ~p", [Other]),
 			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
-	end.
+        after ?POLL_TIMEOUT ->  
+			?ERROR("polling timeout... ~p", [Ticket]),
+			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
+	end,
+    slim_client:unsubscribe(Pid, Ticket),
+    Response.
 
 reply(<<>>, JSON, Req) ->
-	Headers = [{"Content-Type", "application/json"}],
-	Req:respond({200, Headers, JSON});
+	Req:ok({"application/json", JSON});
 
 reply(CB, JSON, Req) ->
-	Headers = [{"Content-Type", "application/javascript"}],
     JS = list_to_binary([CB, "(", JSON, ")"]),
-	Req:respond({200, Headers, JS}).
+	Req:ok({"application/javascript", JS}).
 
