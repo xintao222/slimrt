@@ -112,7 +112,7 @@ with from...,no ticket
 ### Request
 
 ```
-HTTP POST '/rooms/join'
+HTTP POST '/rooms/:id/join'
 ```
 
 ### Response
@@ -126,7 +126,7 @@ HTTP POST '/rooms/join'
 ### Request
 
 ```
-HTTP POST '/rooms/leave'
+HTTP POST '/rooms/:id/leave'
 ```
 
 ### Response
@@ -140,7 +140,7 @@ HTTP POST '/rooms/leave'
 ### Request
 
 ```
-HTTP POST '/rooms/memebers'
+HTTP POST '/rooms/:id/memebers'
 ```
 ### Response
 
@@ -172,8 +172,6 @@ HTTP GET '/packets'
 ```
 /wsocket
 ```
-
-
 
 
 
