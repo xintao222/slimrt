@@ -26,8 +26,6 @@
 
 -include("slimrt.hrl").
 
--include("slim_api.hrl").
-
 -include("slim_log.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
