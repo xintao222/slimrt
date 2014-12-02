@@ -20,6 +20,16 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
+%%------------------------------------------------------------------------------
+%% Description:
+%%
+%% This module handle http api request. Api list:
+%%
+%% endpoint online:		POST /endpoints/online
+%% endpoint offline:	POST /endpoints/offline
+%%
+%%------------------------------------------------------------------------------
+
 -module(slim_http).
 
 -include_lib("slimpp/include/slimpp.hrl").
@@ -30,68 +40,96 @@
 
 -import(proplists, [get_value/2, get_value/3]).
 
+%% start http server
 -export([start/1]).
 
-%%callback....
+%% http callback
 -export([handle/1]).
 
 %%
 %% @doc start http server
 %%
 start(Opts) ->
-	Port = proplists:get_value(port, Opts, 8080),
+	Port = get_value(port, Opts, 8080),
 	case mochiweb:start_http(Port, {?MODULE, handle, []}) of
     {ok, Pid} -> {ok, Pid};
     {error,{already_started, Pid}} -> {ok, Pid}
     end.
 
+%%
+%% @doc http callback
+%%
 handle(Req) ->
+	handle(Req:get(path), Req);
+
+handle("/" ++ ?APIVSN ++ Path, Req) ->
 	Method = Req:get(method),
-	case Req:get(path) of
-	"/" ++ ?APIVSN ++ Path ->
-		case authorized(Method, Path, Req) of
-		true -> handle(Method, Path, Req);
-		false -> Req:respond({401, [], "Fobbiden"})
-		end;
-	_ -> 
-		Req:respond({404, [], "Bad Request"})
-	end.
+	case authorized(Method, Path, Req) of
+	true -> 
+		handle(Method, split_path(Path), Req);
+	false -> 
+		Req:respond({401, [], "Fobbiden"})
+	end;
+
+handle(_BadPath, Req) ->
+	Req:not_found().
 
 %%------------------------------------------------------------------------------
 %% HTTP API 
 %%------------------------------------------------------------------------------
-handle('POST', "/online", Req) ->
-	Params = params(post, Req), 
-	?INFO("online: ~p", [Params]),
+
+%%
+%% Endpoint Online
+%%
+handle('POST', {"endpoints", "online"}, Req) ->
+	Params = params(post, Req),
+	?INFO("endpoints online: ~p", [Params]),
     Domain = get_value(<<"domain">>, Params),
     {Class, Name} = slim_id:parse(get_value(<<"name">>, Params)),
-    FromOid = slim_oid:make(Class, Domain, Name),
-	case slim_client:online(FromOid,  Params) of
-	{ok, Data} -> 
-		reply(200, Data, Req);
+    EpOid = slim_oid:make(Class, Domain, Name),
+	case slim_client:online(EpOid, Params) of
+	{ok, Result} -> 
+		reply(200, Result, Req);
 	{error, Code, Reason} ->
 		reply(Code, Reason, Req)
 	end;
 
-handle('POST', "/offline", Req) ->
+%%
+%% Endpoint Offline
+%%
+handle('POST', {"endpoints", "offline"}, Req) ->
 	Params = params(post, Req),
+	?INFO("endpoints offline: ~p", [Params]),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	slim_client:offline(Ticket, Params),
 	reply(200, Req);
 
-handle('POST', "/presences", Req) ->
+%%
+%% Publish Presence
+%%
+handle('POST', {"presences"}, Req) ->
 	%% update presences??
+	%%TODO: NEED priority, check xmpp protocol????
+	slim_client:publish(Ticket, Presence),
 	%TODO: ....
 	reply(200, Req);
 
-handle('GET', "/presences", Req) ->
+%%
+%% Get Presences
+%%
+handle('GET', {"presences"}, Req) ->
 	Params = params(get, Req),
     Domain = get_value(<<"domain">>, Params),
 	Ids = binary:split(get_value(ids, Params), [<<",">>], [global]),
-	Presences = slim_client:get_presences(Domain, Ids),
+	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
+				  slim_oid:make(Cls, Domain, Id) end || RawId <- Ids],
+	Presences = slim_client:presences(Oids),
 	reply(200, Presences, Req);
 
-handle('POST', "/messages/send", Req) ->
+%% 
+%% Send Message
+%%
+handle('POST', {"messages"}, Req) ->
 	Params = params(post, Req),
 	Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	case slim_client:send_message(Ticket, Params) of
@@ -101,7 +139,10 @@ handle('POST', "/messages/send", Req) ->
 		reply(500, Reason, Req)
 	end;
 
-handle('POST', "/messages/push", Req) ->
+%% 
+%% Push Message
+%%
+handle('POST', {"/messages", "push"}, Req) ->
 	Params = params(post, Req),
 	Domain = get_value(<<"domain">>, Params),
 	{FromCls, From} = slim_id:parse(get_value(<<"from">>, Params)),
@@ -113,24 +154,38 @@ handle('POST', "/messages/push", Req) ->
 		reply(500, Reason, Req)
 	end;
 
-handle('POST', "/rooms/join", Req) ->
+%% 
+%% Join Room
+%%
+handle('POST', {"rooms", RoomId, "join"}, Req) ->
 	reply(200, Req);
 
-handle('POST', "/rooms/leave", Req) ->
+%% 
+%% Leave Room
+%%
+handle('POST', {"rooms", RoomId, "leave"}, Req) ->
 	reply(200, Req);
 
-handle('GET', "/rooms/members", Req) ->
+%% 
+%% Get presences of room members
+%%
+handle('GET', {"rooms", RoomId, "members"}, Req) ->
 	reply(200, Req);
+
 
 %%------------------------------------------------------------------------------
 %% Long Polling
 %%------------------------------------------------------------------------------
-handle('GET', "/packets", Req) ->
+handle('GET', {"packets"}, Req) ->
 	slim_jsonp:handle(params(get, Req), Req);
 
 handle(_Method, _Path, Req) ->
-	reply(400, <<"Bad Request">>, Req).
+	Req:not_found().
 
+
+%%------------------------------------------------------------------------------
+%% HTTP Basic Auth
+%%------------------------------------------------------------------------------
 authorized('GET', "/packets", _Req) ->
 	true; %%no need to auth
 
@@ -145,6 +200,12 @@ authorized(_, _Path, Req) ->
         end
 	end.
 
+%%------------------------------------------------------------------------------
+%% Internal functions
+%%------------------------------------------------------------------------------
+split_path(Path) ->
+	list_to_tuple(string:tokens(Path, "/")).
+
 params(get, Req) ->
 	[{list_to_binary(Key), list_to_binary(Value)} 
 		|| {Key, Value} <- mochiweb_request:parse_qs(Req)];
@@ -152,6 +213,14 @@ params(get, Req) ->
 params(post, Req) ->
 	[{list_to_binary(Key), list_to_binary(Value)} 
 		|| {Key, Value} <- mochiweb_request:parse_post(Req)].
+
+ok(Req) ->
+	Json = slim_json:encode([{status, ok}]),
+	Req:ok({"application/json", Json}).
+
+ok(Req, Data) ->
+	Json = slim_json:encode([{status, ok}, {data, Data}]),
+	Req:ok({"application/json", Json}).
 
 reply(Code, Req) when (code >= 200) and (Code < 300)  ->
 	Json = slim_json:encode([{status, ok}]),

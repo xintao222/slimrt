@@ -32,7 +32,9 @@
 %each client has a ticket :)
 -record(slim_client, {
     ticket		:: ticket(),
-    pid		:: pid(),
+	cid			:: binary(), %Not used: client id
+    cname		:: binary(), %Not used: client name
+    pid			:: pid(),
     ref			:: reference(),
     mon			:: reference(),
     type		:: atom(),

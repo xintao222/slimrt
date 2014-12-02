@@ -158,8 +158,26 @@ init([{Oid, Buddies, Rooms}]) ->
 	%%FIXME: nick....
 	join_rooms(Oid, "Nick", Rooms),
 	register_route(Oid),
+	%%TODO: online presence...
+	%%send online presence
 	Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
     {ok, #state{oid = Oid, nick = "Nick", ref = Ref}}.
+
+%%
+%%	slim_endpoint:send(Pid, #slim_presence{
+%%	type = online, 
+%%	nick = Nick, 
+%%	from = FromOid, 
+%%	show = Show, 
+%%	status = Status}).
+%%
+
+%%
+        %TODO: should update rooms
+%%       if
+%%            Show == OldShow -> ignore;
+%%            true -> slim_router:update(Route#slim_route{show=Show})
+%%       end,
 
 add_buddies(ThisOid, Buddies) ->
 	%%TODO: Only onlines???

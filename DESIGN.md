@@ -9,6 +9,13 @@
 HTTP POST '/endpoints/online'
 ```
 
+Parameters:
+
+name
+nick
+clientId
+
+
 ### Response
 
 ```

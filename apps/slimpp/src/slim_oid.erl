@@ -57,6 +57,6 @@ name(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.name.
 
 -spec topic(Oid :: oid()) -> binary().
 topic(#slim_oid{domain=Domain, class=Class, name=Name}) ->
-    list_to_binary(["/domain/", Domain, "/", atom_to_list(Class), "/", Name]).
+    list_to_binary(["/dn/", Domain, "/", atom_to_list(Class), "/", Name]).
 
 

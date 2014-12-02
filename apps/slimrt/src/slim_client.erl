@@ -36,11 +36,16 @@
 
 -export([subscribe/2, unsubscribe/2]).
 
-online(FromOid, Params) ->
+-spec online(EpOid :: oid(), Params :: list(tuple())) -> {ok, any()} | {error, integer(), binary()}.
+online(EpOid, Params) when ?is_oid(EpOid) ->
 	%domain
     Domain = get_value(<<"domain">>, Params),
 
+	%clientId
+	ClientId = get_value(<<"clientId">>, Params),
+
 	%properties
+    Name = get_value(<<"name">>, Params),
     Nick = get_value(<<"nick">>, Params),
     Show = get_value(<<"show">>, Params, <<"available">>),
     Status = get_value(<<"status">>, Params, <<>>),
@@ -49,67 +54,50 @@ online(FromOid, Params) ->
     Buddies = parse(buddies, Domain, Params),
 	Rooms = parse(rooms, Domain, Params),
 
-    {ok, Endpoint} =
-    case slim_router:lookup(FromOid) of
+	%% find or create endpoint
+    {ok, EPid} =
+    case slim_router:lookup(EpOid) of
     [] ->
-		%%TODO: is ok???
-        {ok, Pid} = slim_endpoint_sup:start_child({FromOid, Buddies, Rooms}),
-		slim_endpoint:send(Pid, #slim_presence{
-			type = online, 
-			nick = Nick, 
-			from = FromOid, 
-			show = Show, 
-			status = Status}),
-		{ok, Pid};
-    [Route = #slim_route{pid=Pid, show = OldShow}] ->
-		%在线支持好友关系问题
-		%%FIXME: 不合理....
-		slim_endpoint:update(Pid, {buddies, Buddies}),
-		slim_endpoint:update(Pid, {rooms, Rooms}),
-        %TODO: should update rooms
-        if
-            Show == OldShow -> ignore;
-            true -> slim_router:update(Route#slim_route{show=Show})
-        end,
-        {ok, Route#slim_route.pid}
+		Endpoint = #slim_endpoint{
+				oid = EpOid, 
+				name = Name, 
+				nick = Nick, 
+				show = Show,
+				status = Status},
+        slim_endpoint_sup:start_child({Endpoint, Buddies, Rooms});
+    [#slim_route{pid=Pid}] ->
+		%在线支持好友关系问题 %%FIXME: 不合理.... clientId优先级....should have a roster version tag...
+		slimp_endpoint:update(Pid, [{buddies, Buddies}, {rooms, Rooms}, {show, Show}]),
+        {ok, Pid}
     end,
-
-	%%TODO:...
-	{ok, Ticket} = slim_endpoint:bind(Endpoint, <<"clientId">>),
+	%%TODO: bind the clientId...return ticket and all clients??
+	{ok, Ticket, Clients} = slim_endpoint:bind(EPid, ClientId),
 	Response = [{ticket, slim_ticket:encode(Ticket)},
-                {server, slim_port:addrs()}],
+                {server, slim_port:addrs()},
+				{clients, Clients},
+				{presences, presences(Buddies)}],
+	{ok, Response}.
 
-	%response
-	Response1 = 
-    case presences(Buddies) of
-    {ok, []} ->
-		[{presences, {}} | Response];
-    {ok, Presences} ->
-		[{presences, Presences} | Response]
-    end,
-	{ok, Response1}.
-
+-spec offline(Ticket :: ticket(), Params :: list(tuple())) -> ok.
 offline(Ticket, Params) ->
 	case slim_climgr:lookup(Ticket) of
 	undefined ->
 		?ERROR("~s is alread offline...", [Ticket]);
-	Pid ->
-		slim_endpoint:unbind(Pid, Ticket)
+	EPid ->
+		slim_endpoint:unbind(EPid, Ticket)
 	end.
 
-%%TODO: should be fixed...
-presences(Domain, Ids) when is_list(Ids) ->
-	Oids = [begin {Cls, Id} = slim_id:parse(RawId), 
-				  slim_oid:make(Cls, Domain, Id) 
-		    end || RawId <- Ids],
-	presences(Oids).
-
+-spec presences(Oids :: list(oid())) -> list(tuple()).
 presences(Oids) when is_list(Oids) ->
-	{ok, [ {slim_id:from(O), Sh} || #slim_route{oid = O, show = Sh} <- slim_router:lookup(Oids) ]}.
+	[{slim_id:from(Oid), Show} || #slim_route{oid = Oid, show = Show} <- slim_router:lookup(Oids)].
 
-set_presence(Params) ->
-    ok.
 
+publish(Ticket, Presence) when ?is_ticket(Ticket), ?is_presence(Presence) ->
+	%%TOOD: 
+	ok.
+	
+send(Ticket, Message) when ?is_ticket(Ticket), ?is_message(Message) ->
+	%%TODO: SEND MESSAGE
 send_message(Ticket, Params) ->
 	%from
     Domain = get_value(<<"domain">>, Params),
@@ -135,19 +123,10 @@ send_message(Ticket, Params) ->
 		{error, "Client Not Found"}
 	end.
 
-makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
-	slim_oid:make(Cls, Domain, Name).
 
-makeoid(Domain, Type, Name) ->
-	%%FIXME:......
-	{Tag, Id} = slim_id:parse(Name),
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(Tag, Domain, Id);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, Id)
-	end.
-
+push(FromOid, Message) when ?id_oid(FromOid), ?is_message(Message) ->
+	%%TODO: push message
+	ok.
 push_message(FromOid, Params) ->
 	%%FIXME:......
 	Domain = get_value(<<"domain">>, Params),
@@ -158,20 +137,22 @@ push_message(FromOid, Params) ->
 	%publish directly
 	slim_router:route(FromOid, ToOid, Message).
 
-join_room() ->
-    ok.
-
-leave_room() ->
-    ok.
-
-room_members() ->
-    ok.
-
+%%TODO: subscribe(Ticket, Pid)
 subscribe(Endpoint, Ticket) when is_pid(Endpoint) and ?is_ticket(Ticket) ->
 	slim_endpoint:subscribe(Endpoint, Ticket, self()).
 
+%%TODO: unsubscribe(Ticket, Pid)
 unsubscribe(Endpoint, Ticket) ->
 	slim_endpoint:unsubscribe(Endpoint, Ticket, self()).
+
+join(Ticket, RoomOid) when  ->
+    ok.
+
+leave(Ticket, RoomOid) ->
+    ok.
+
+members(Ticket, RoomOid) ->
+    ok.
 
 %%---------------------------------------------------
 %% internal 
@@ -191,4 +172,16 @@ parse(rooms, Domain, Params) ->
     [slim_oid:make(gid, Domain, Room) 
 		|| Room <- bsplit(Rooms, <<",">>)].
 
+makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
+	slim_oid:make(Cls, Domain, Name).
+
+makeoid(Domain, Type, Name) ->
+	%%FIXME:......
+	{Tag, Id} = slim_id:parse(Name),
+	case Type of
+	<<"chat">> -> 
+		slim_oid:make(Tag, Domain, Id);
+	<<"grpchat">> -> 
+		slim_oid:make(gid, Domain, Id)
+	end.
 
