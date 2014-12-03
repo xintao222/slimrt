@@ -40,7 +40,7 @@ run(I, Max) ->
     {error, Reason} ->
         io:format("Error: ~p~n", [Reason])
     end,
-    timer:sleep(400),
+    timer:sleep(200),
     run(I-1, Max).
 
 loop(JSON, Profile) ->

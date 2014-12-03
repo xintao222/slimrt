@@ -93,6 +93,7 @@ handle('POST', {"endpoints", "online"}, Params, Req) ->
     EpOid = slim_oid:make(Cls, Domain, Id),
 	case slim_client:online(EpOid, Params) of
 	{ok, Result} ->
+		?DEBUG("online result: ~p", [Result]),
 		ok(Result, Req);
 	{error, Code, Reason} ->
 		reply(Code, Reason, Req)
