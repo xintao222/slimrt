@@ -62,7 +62,7 @@ start(Opts) ->
 %% @doc http callback
 %%
 handle(Req) ->
-	handle(Req:get(path), Req);
+	handle(Req:get(path), Req).
 
 handle("/" ++ ?APIVSN ++ Path, Req) ->
 	Method = Req:get(method),
@@ -102,8 +102,7 @@ handle('POST', {"endpoints", "online"}, Params, Req) ->
 %% Endpoint Offline
 %%
 handle('POST', {"endpoints", "offline"}, Params, Req) ->
-    STicket = get_value(<<"ticket">>, Params),
-    Ticket = slim_ticket:make(STicket),
+    Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	ok = slim_client:offline(Ticket, Params),
 	ok(Req);
 
@@ -112,9 +111,8 @@ handle('POST', {"endpoints", "offline"}, Params, Req) ->
 %%
 handle('POST', {"presences"}, Params, Req) ->
     Domain = get_value(<<"domain">>, Params),
-    STicket = get_value(<<"ticket">>, Params),
-    Ticket = #slim_ticket{class=Cls, name = Id} = slim_ticket:make(STicket),
-    EpOid = slim_oid:make(Cls, Domain, Id),
+    Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+    EpOid = slim_oid:make(Domain, Ticket),
     
     %% TODO: need clientId?
     %% presence 
@@ -156,47 +154,29 @@ handle('GET', {"presences"}, Params, Req) ->
 %%
 handle('POST', {"messages"}, Params, Req) ->
     Domain = get_value(<<"domain">>, Params),
-	Ticket = #slim_ticket{class=Cls, name=Id} 
-        = slim_ticket:make(get_value(<<"ticket">>, Params)),
-	FromOid = makeoid(Domain, Ticket),
-	
+	Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+	FromOid = slim_oid:make(Domain, Ticket),
 	%type
 	Type = get_value(<<"type">>, Params, <<"chat">>),
-	{ToCls, ToId} = slim_id:parse(get_value(<<"to">>, Params)),
-	ToOid = 
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(ToCls, Domain, ToId);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, ToId)
-	end,
+	ToOid = makeoid(Domain, Type, get_value(<<"to">>, Params)),
 	Message = slim_message:make(Type, FromOid, ToOid, Params),
-
 	case slim_client:send(Ticket, Message) of
-	ok ->
-		reply(Req);
-	{error, Code, Reason} ->
-		reply(Code, Reason, Req)
+		ok -> ok(Req);
+		{error, Code, Reason} -> reply(Code, Reason, Req)
 	end;
 
 %% 
 %% Push Message
 %%
-handle('POST', {"/messages", "push"}, Params, Req) ->
+handle('POST', {"messages", "push"}, Params, Req) ->
 	Domain = get_value(<<"domain">>, Params),
+	%% from oid
 	{FromCls, FromId} = slim_id:parse(get_value(<<"from">>, Params)),
 	FromOid = slim_oid:make(FromCls, Domain, FromId),
-
+	%% type
 	Type = get_value(<<"type">>, Params, <<"chat">>),
-    %%TODO: ok??
-	{ToCls, ToId} = slim_id:parse(get_value(<<"to">>, Params)),
-	ToOid = 
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(ToCls, Domain, ToId);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, ToId)
-	end,
+	%% to oid
+	ToOid = makeoid(Domain, Type, get_value(<<"to">>, Params)),
 	Message = slim_message:make(Type, FromOid, ToOid, Params),
 	ok = slim_client:push(FromOid, ToOid, Message),
     ok(Req);
@@ -205,23 +185,31 @@ handle('POST', {"/messages", "push"}, Params, Req) ->
 %% Join Room
 %%
 handle('POST', {"rooms", RoomId, "join"}, Params, Req) ->
-    %%TODO:...
-	ok(Req);
+	RoomOid = slim_oid:make(gid, get_value(<<"domain">>, Params), RoomId),
+	case slim_client:join_room(ticket(Params), RoomOid, Params) of
+	ok -> ok(Req);
+	{error, Code, Reason} -> reply(Code, Reason, Req)
+	end;
 
 %% 
 %% Leave Room
 %%
 handle('POST', {"rooms", RoomId, "leave"}, Params, Req) ->
-    %%TODO:...
-	ok(Req);
+	RoomOid = slim_oid:make(gid, get_value(<<"domain">>, Params), RoomId),
+	case slim_client:leave_room(ticket(Params), RoomOid, Params) of
+	ok -> ok(Req);
+	{error, Code, Reason} -> reply(Code, Reason, Req)
+	end;
 
 %% 
 %% Get presences of room members
 %%
 handle('GET', {"rooms", RoomId, "members"}, Params, Req) ->
-    %%TODO:...
-	ok(Req);
-
+	RoomOid = slim_oid:make(gid, get_value(<<"domain">>, Params), RoomId),
+	case slim_client:room_members(ticket(Params), RoomOid) of
+	{ok, Members} -> ok(Members, Req);
+	{error, Code, Reason} -> reply(Code, Reason, Req)
+	end;
 
 %%------------------------------------------------------------------------------
 %% Long Polling
@@ -232,7 +220,7 @@ handle('GET', {"packets"}, Params, Req) ->
 %%------------------------------------------------------------------------------
 %% Websocket connection
 %%------------------------------------------------------------------------------
-handle(_Method, _Path, Req) ->
+handle(_Method, _Path, _Params, Req) ->
 	Req:not_found().
 
 %%------------------------------------------------------------------------------
@@ -255,6 +243,18 @@ authorized(_, _Path, Req) ->
 %%------------------------------------------------------------------------------
 %% Internal functions
 %%------------------------------------------------------------------------------
+ticket(Params) ->
+	slim_ticket:make(get_value(<<"ticket">>, Params)).
+
+makeoid(Domain, Type, RawId) ->
+	{Cls, Id} = slim_id:parse(RawId),
+	case Type of
+	<<"chat">> -> 
+		slim_oid:make(Cls, Domain, Id);
+	<<"grpchat">> -> 
+		slim_oid:make(gid, Domain, Id)
+	end.
+
 split_path(Path) ->
 	list_to_tuple(string:tokens(Path, "/")).
 
@@ -286,16 +286,4 @@ reply(Code, Reason, Req) when (code >= 400) ->
 	Json = slim_json:encode([{status, error}, {reason, Reason}]),
 	Req:respond({Code, [{"Content-Type", "text/plain"}], Json}). 
 
-makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
-	slim_oid:make(Cls, Domain, Name).
-
-makeoid(Domain, Type, Name) ->
-	%%FIXME:......
-	{Tag, Id} = slim_id:parse(Name),
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(Tag, Domain, Id);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, Id)
-	end.
 

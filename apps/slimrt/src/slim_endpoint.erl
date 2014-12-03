@@ -20,6 +20,12 @@
 %% SOFTWARE.
 %%------------------------------------------------------------------------------
 
+%%------------------------------------------------------------------------------
+%%
+%% Description:  Core Route Endpoint Module. 
+%%
+%%------------------------------------------------------------------------------
+
 -module(slim_endpoint).
 
 -author('feng.lee@slimchat.io').
@@ -35,6 +41,7 @@
 -export([start_link/1,
         clients/1,
 		buddies/2,
+		update/2, %% TODO:
         bind/2, 
 		unbind/2, 
 		subscribe/3, 
@@ -43,7 +50,6 @@
 		send/2,
         update/2]).
 
-%TODO: Group operation
 -export([join/3,
 		leave/3]).
 
@@ -208,8 +214,8 @@ handle_call(info, _From, State) ->
 
 %%ClientId is not used...
 handle_call({bind, _ClientId}, _From, #state{oid = Oid, ref = IdleTimer, clients = Clients} = State) ->
-	#slim_oid{domain = Domain, class = Cls, name = Name} = Oid,
-    Ticket = slim_ticket:make(Cls, Name),
+	#slim_oid{domain = Domain, class = Cls, id = Id} = Oid,
+    Ticket = slim_ticket:make(Cls, Id),
 	?INFO("bind: ~p", [Ticket]),
 	cancel_timer(IdleTimer),
 	undefined = get(Ticket),

@@ -24,27 +24,34 @@
 
 -include("slimpp.hrl").
 
--export([make/1, make/3,
+-export([make/1, make/2, make/3,
          class/1,
          domain/1,
-         name/1,
+         id/1,
          topic/1]).
 
-%Example: {<<"/domain/$domain/$class/$id">>, <<"$domain">>, $class, <<"$id">>}
+%Example: {<<"/dn/$domain/$class/$id">>, <<"$domain">>, $class, <<"$id">>}
 
 %%
-%% @doc Make a oid with class, domain, name.
+%% @doc Make an oid with class, domain, id.
 %%
--spec make({Class :: oid_class(), Domain :: binary(), Name :: binary()}) -> oid().
-make({Class, Domain, Name}) when is_atom(Class) and is_binary(Domain) and is_binary(Name) ->
-    make(Class, Domain, Name).
+-spec make({Class :: oid_class(), Domain :: binary(), Id :: binary()}) -> oid().
+make({Class, Domain, Id}) when is_atom(Class) and is_binary(Domain) and is_binary(Id) ->
+    make(Class, Domain, Id).
 
 %%
-%% @doc Make a oid with class, domain, name.
+%% @doc Make an oid with domain, ticket
 %%
--spec make(Class :: oid_class(), Domain :: binary(), Name :: binary()) -> oid().
-make(Class, Domain, Name) when is_atom(Class) and is_binary(Domain) and is_binary(Name) ->
-    #slim_oid{domain = Domain, class = Class, name = Name}.
+-spec make(Domain :: binary(), ticket()) -> oid().
+make(Domain, #slim_ticket{class=Class, id=Id}) ->
+    make(Class, Domain, Id).
+
+%%
+%% @doc Make an oid with class, domain, id.
+%%
+-spec make(Class :: oid_class(), Domain :: binary(), Id :: binary()) -> oid().
+make(Class, Domain, Id) when is_atom(Class) and is_binary(Domain) and is_binary(Id) ->
+    #slim_oid{domain = Domain, class = Class, id = Id}.
 
 -spec class(Oid :: oid()) -> atom().
 class(Oid) when ?is_oid(Oid) -> Oid#slim_oid.class.
@@ -52,11 +59,12 @@ class(Oid) when ?is_oid(Oid) -> Oid#slim_oid.class.
 -spec domain(Oid :: oid()) -> binary().
 domain(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.domain.
 
--spec name(Oid :: oid()) -> binary().
-name(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.name.
+-spec id(Oid :: oid()) -> binary().
+id(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.id.
 
 -spec topic(Oid :: oid()) -> binary().
-topic(#slim_oid{domain=Domain, class=Class, name=Name}) ->
-    list_to_binary(["/dn/", Domain, "/", atom_to_list(Class), "/", Name]).
+topic(#slim_oid{domain=Domain, class=Class, id=Id}) ->
+    list_to_binary(["/dn/", Domain, "/", atom_to_list(Class), "/", Id]).
+
 
 

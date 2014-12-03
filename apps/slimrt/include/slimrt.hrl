@@ -50,11 +50,9 @@
 %%------------------------------------------------------------------------------
 -record(slim_endpoint, {
     oid		:: oid(), 
-    name	:: binary(),
     nick	:: binary(),
-    domain	:: binary(),
-	status	:: binary(),
-    show = available	:: presence_show()
+    show = available	:: presence_show(),
+	status	:: binary()
 }).
 
 -type endpoint() :: #slim_endpoint{}.

@@ -32,20 +32,33 @@
 
 -import(proplists, [get_value/2, get_value/3]).
 
+%% endpoints api
 -export([online/2, offline/2]).
 
+%% presence api
+-export([presences/1, publish/2]).
+
+%% messages api
+-export([push/3, send/2]).
+
+%% subscribe, unsubscribe
 -export([subscribe/2, unsubscribe/2]).
 
+%% rooms api
+-export([join_room/3, leave_room/3, room_members/2]).
+
+%%
+%% @doc endpoint online...
+%%
 -spec online(EpOid :: oid(), Params :: list(tuple())) -> {ok, any()} | {error, integer(), binary()}.
 online(EpOid, Params) when ?is_oid(EpOid) ->
 	%domain
     Domain = get_value(<<"domain">>, Params),
 
-	%clientId
-	ClientId = get_value(<<"clientId">>, Params),
+	%TODO: clientId, will be supported 0.2 version...
+	%%ClientId = get_value(<<"clientId">>, Params),
 
 	%properties
-    Name = get_value(<<"name">>, Params),
     Nick = get_value(<<"nick">>, Params),
     Show = get_value(<<"show">>, Params, <<"available">>),
     Status = get_value(<<"status">>, Params, <<>>),
@@ -60,7 +73,6 @@ online(EpOid, Params) when ?is_oid(EpOid) ->
     [] ->
 		Endpoint = #slim_endpoint{
 				oid = EpOid, 
-				name = Name, 
 				nick = Nick, 
 				show = Show,
 				status = Status},
@@ -70,64 +82,119 @@ online(EpOid, Params) when ?is_oid(EpOid) ->
 		slimp_endpoint:update(Pid, [{buddies, Buddies}, {rooms, Rooms}, {show, Show}]),
         {ok, Pid}
     end,
-	%%TODO: bind the clientId...return ticket and all clients??
-	{ok, Ticket, Clients} = slim_endpoint:bind(EPid, ClientId),
+	%%TODO: bind the clientId...return ticket and all clients?? return clients???
+	{ok, Ticket} = slim_endpoint:bind(EPid, <<"ClientId">>), %TODO: 0.2 version support clientId, Clients
 	Response = [{ticket, slim_ticket:encode(Ticket)},
                 {server, slim_port:addrs()},
-				{clients, Clients},
+				%{clients, Clients},
 				{presences, presences(Buddies)}],
 	{ok, Response}.
 
+%%
+%% @doc endpoint offline...
+%%
 -spec offline(Ticket :: ticket(), Params :: list(tuple())) -> ok.
-offline(Ticket, Params) ->
-	case slim_climgr:lookup(Ticket) of
+offline(Ticket, _Params) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		slim_endpoint:unbind(EPid, Ticket);
 	undefined ->
-		?ERROR("~s is alread offline...", [Ticket]);
-	EPid ->
-		slim_endpoint:unbind(EPid, Ticket)
+		?ERROR("~s is alread offline...", [Ticket])
 	end.
 
+%%
+%% Lookup presences
+%%
 -spec presences(Oids :: list(oid())) -> list(tuple()).
 presences(Oids) when is_list(Oids) ->
 	[{slim_id:from(Oid), Show} || #slim_route{oid = Oid, show = Show} <- slim_router:lookup(Oids)].
 
 
+%%
+%% @doc Publish Presence
+%%
 publish(Ticket, Presence) when ?is_ticket(Ticket), ?is_presence(Presence) ->
-	%%TOOD: 
-	ok.
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		ok = slim_endpoint:publish(EPid, Ticket, Presence);
+	undefined ->
+		{error, 500, <<"Ticket Not Found.">>}
+	end.
 	
+%%
+%% @doc Send Message
+%%
 send(Ticket, Message) when ?is_ticket(Ticket), ?is_message(Message) ->
 	case slim_cm:lookup(Ticket) of
 	EPid when is_pid(EPid) ->
-		slim_endpoint:send(EPid, Ticket, Message);
+		ok = slim_endpoint:send(EPid, Ticket, Message);
 	undefined -> 
-		{error, 500, "Client Not Found"}
+		{error, 500, <<"Ticket Not Found.">>}
 	end.
 
-push(FromOid, ToOid, Message) when ?id_oid(FromOid), ?is_message(Message) ->
-	%publish directly
-	slim_router:route(FromOid, ToOid, Message).
+%%
+%% @doc Push Message Directly
+%%
+push(FromOid, ToOid, Message) when ?is_oid(FromOid), ?is_oid(ToOid), ?is_message(Message) ->
+	%publish directly???
+	ok = slim_router:route(FromOid, ToOid, Message).
 
-%%TODO: subscribe(Ticket, Pid)
-subscribe(Endpoint, Ticket) when is_pid(Endpoint) and ?is_ticket(Ticket) ->
-	slim_endpoint:subscribe(Endpoint, Ticket, self()).
+%%
+%% @doc subscribe endpoint to receive packets
+%%
+-spec subscribe(Ticket :: ticket(), SubPid :: pid()) -> ok | {error, integer(), binary()}.
+subscribe(Ticket, SubPid) when ?is_ticket(Ticket), is_pid(SubPid) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		ok = slim_endpoint:subscribe(EPid, Ticket, SubPid);
+	undefined  ->
+		{error, 500, <<"Ticket Not Found">>}
+	end.
+%%
+%% @doc unsubscribe endpoint
+%%
+-spec unsubscribe(Ticket :: ticket(), SubPid :: pid()) -> ok.
+unsubscribe(Ticket, SubPid) when ?is_ticket(Ticket), is_pid(SubPid) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		ok = slim_endpoint:unsubscribe(EPid, Ticket, SubPid);
+	undefined ->
+		?ERROR("cannot unsubscribe: ~p", [Ticket]),
+		{error, 500, <<"Ticket Not Found">>}
+	end.
 
-%%TODO: unsubscribe(Ticket, Pid)
-unsubscribe(Endpoint, Ticket) ->
-	slim_endpoint:unsubscribe(Endpoint, Ticket, self()).
+%%------------------------------------------------------------------------------
+%% Room API: join, leave, members
+%%------------------------------------------------------------------------------
+join_room(Ticket, RoomOid, Params) when ?is_ticket(Ticket), ?is_oid(RoomOid) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		Nick = get_value(<<"nick">>, Params, Params),
+		ok = slim_endpoint:join(EPid, RoomOid, Nick);
+	undefined ->
+		{error, 500, <<"Ticket Not Found">>}
+	end.
 
-join(Ticket, RoomOid) when  ->
-%%TODO: join room...
-    ok.
+leave_room(Ticket, RoomOid, Params) when ?is_ticket(Ticket), ?is_oid(RoomOid) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		Nick = get_value(<<"nick">>, Params),
+		ok = slim_endpoint:leave(EPid, RoomOid, Nick);
+	undefined ->
+		{error, 500, <<"Ticket Not Found">>}
+	end.
 
-leave(Ticket, RoomOid) ->
-%%TODO: leave room...
-    ok.
-
-members(Ticket, RoomOid) ->
-%%TODO: get room members...
-    ok.
-
+room_members(Ticket, RoomOid) when ?is_ticket(Ticket), ?is_oid(RoomOid) ->
+	case slim_cm:lookup(Ticket) of
+	EPid when is_pid(EPid) ->
+		Oids = [Oid || #slim_room{oid = Oid} <- slim_grpchat:members(RoomOid)],
+        {ok, [{slim_id:from(O), Show} 
+			 	|| #slim_route{oid = O, show = Show} 
+					<- slim_router:lookup(Oids)]};
+	undefined ->
+		{error, 500, <<"Ticket Not Found">>}
+	end.
+	
 %%---------------------------------------------------
 %% internal 
 %%---------------------------------------------------
@@ -137,25 +204,11 @@ bsplit(Bin, Sep) ->
 parse(buddies, Domain, Params) ->
 	Input = get_value(<<"buddies">>, Params, <<>>),
     lists:map(fun(I) -> 
-		{Tag, Id} = slim_id:parse(I),
-		slim_oid:make(Tag, Domain, Id)
+		{Cls, Id} = slim_id:parse(I),
+		slim_oid:make(Cls, Domain, Id)
 	end, bsplit(Input, <<",">>));
 
 parse(rooms, Domain, Params) ->
     Rooms = get_value(<<"rooms">>, Params, <<>>),
     [slim_oid:make(gid, Domain, Room) 
 		|| Room <- bsplit(Rooms, <<",">>)].
-
-makeoid(Domain, #slim_ticket{class=Cls, name=Name}) ->
-	slim_oid:make(Cls, Domain, Name).
-
-makeoid(Domain, Type, Name) ->
-	%%FIXME:......
-	{Tag, Id} = slim_id:parse(Name),
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(Tag, Domain, Id);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, Id)
-	end.
-
