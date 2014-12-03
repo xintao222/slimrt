@@ -34,10 +34,10 @@
     ticket		:: ticket(),
 	cid			:: binary(), %Not used: client id
     cname		:: binary(), %Not used: client name
-    pid			:: pid(),
-    ref			:: reference(),
-    mon			:: reference(),
-    type		:: atom(),
+    ref			:: reference(), %%idle timer ref
+    pid			:: pid(), %subscriber pid
+    mon			:: reference(), %subscriber monitor
+    type		:: atom(), %poll, wsocket, mqtt...
     packets=[]	:: list()
 }).
 
