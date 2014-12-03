@@ -97,43 +97,14 @@ publish(Ticket, Presence) when ?is_ticket(Ticket), ?is_presence(Presence) ->
 	ok.
 	
 send(Ticket, Message) when ?is_ticket(Ticket), ?is_message(Message) ->
-	%%TODO: SEND MESSAGE
-send_message(Ticket, Params) ->
-	%from
-    Domain = get_value(<<"domain">>, Params),
-	FromOid = makeoid(Domain, Ticket),
-	
-	%type
-	Type = get_value(<<"type">>, Params, <<"chat">>),
-
-	%to
-	{ToCls, To} = slim_id:parse(get_value(<<"to">>, Params)),
-	ToOid = 
-	case Type of
-	<<"chat">> -> 
-		slim_oid:make(ToCls, Domain, To);
-	<<"grpchat">> -> 
-		slim_oid:make(gid, Domain, To)
-	end,
-	Message = slim_message:make(Type, FromOid, ToOid, Params),
 	case slim_cm:lookup(Ticket) of
-	Pid when is_pid(Pid) ->
-		slim_endpoint:send(Pid, Ticket, ToOid, Message);
+	EPid when is_pid(EPid) ->
+		slim_endpoint:send(EPid, Ticket, Message);
 	undefined -> 
-		{error, "Client Not Found"}
+		{error, 500, "Client Not Found"}
 	end.
 
-
-push(FromOid, Message) when ?id_oid(FromOid), ?is_message(Message) ->
-	%%TODO: push message
-	ok.
-push_message(FromOid, Params) ->
-	%%FIXME:......
-	Domain = get_value(<<"domain">>, Params),
-	Type = get_value(<<"type">>, Params, <<"chat">>),
-	To = get_value(<<"to">>, Params), 
-	ToOid = makeoid(Domain, Type, To),
-	Message = slim_message:make(Type, FromOid, ToOid, Params),
+push(FromOid, ToOid, Message) when ?id_oid(FromOid), ?is_message(Message) ->
 	%publish directly
 	slim_router:route(FromOid, ToOid, Message).
 
@@ -146,12 +117,15 @@ unsubscribe(Endpoint, Ticket) ->
 	slim_endpoint:unsubscribe(Endpoint, Ticket, self()).
 
 join(Ticket, RoomOid) when  ->
+%%TODO: join room...
     ok.
 
 leave(Ticket, RoomOid) ->
+%%TODO: leave room...
     ok.
 
 members(Ticket, RoomOid) ->
+%%TODO: get room members...
     ok.
 
 %%---------------------------------------------------

@@ -33,7 +33,7 @@
 -record(slim_oid, {
 	domain	:: binary(),
 	class	:: oid_class(),
-	name	:: binary()
+	id      :: binary()
 }).
 
 -type oid() :: #slim_oid{}.
@@ -55,6 +55,7 @@
 	from		:: oid(), 	 		% send from
 	nick		:: binary(), 		% sender nickname
 	to			:: oid(),	 		% send to
+    client      :: binary(),        % from client id
 	%% message content
 	format		:: message_format(),% content format
 	encoding	:: binary(),		% content encoding
@@ -78,8 +79,9 @@
 	type	:: presence_type(),
 	from	:: oid(),
 	nick	:: binary(),
+    client  :: binary(),
 	to		:: oid(),		%% optional
-	priority:: integer(),   %not used
+	priority:: integer(),   %not used, client priority
 	show	:: presence_show(),
 	status	:: binary(),
 	ts		:: integer()
@@ -94,7 +96,7 @@
 %%------------------------------------------------------------------------------
 -record(slim_ticket, {
 	class	:: atom(),
-	name	:: binary(),
+	id  	:: binary(),
 	token	:: binary()
 }).
 
