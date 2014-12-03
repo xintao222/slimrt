@@ -34,7 +34,7 @@ make_test() ->
     ?assertMatch(#slim_presence{ show = available }, Presence).
 
 new_presence() ->
-    FromOid = #slim_oid{domain = <<"localhost">>, class=vid, name = <<"v1291">>},
+    FromOid = #slim_oid{domain = <<"localhost">>, class=vid, id = <<"v1291">>},
     Params = [
         {<<"nick">>, <<"V1291">>},
         {<<"show">>, <<"available">>},

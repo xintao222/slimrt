@@ -29,10 +29,10 @@
 -include_lib("eunit/include/eunit.hrl").
 
 make_test() ->
-	?assertMatch(#slim_ticket{class = uid, name = <<"1">>}, slim_ticket:make(<<"uid:1:29djalaldu3d">>)).
+	?assertMatch(#slim_ticket{class = uid, id = <<"1">>}, slim_ticket:make(<<"uid:1:29djalaldu3d">>)).
 
 encode_test() ->
-	Ticket = #slim_ticket{class = uid, name = <<"1">>, token = <<"29djalaldu3d">>},
+	Ticket = #slim_ticket{class = uid, id = <<"1">>, token = <<"29djalaldu3d">>},
 	?assertEqual(<<"uid:1:29djalaldu3d">>, slim_ticket:encode(Ticket)).
 
 -endif.

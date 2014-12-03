@@ -41,8 +41,8 @@ encode_error_test() ->
 	?debugMsg(Json).
 
 new_message() ->
-	FromOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid1">>},
-	ToOid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"uid2">>},
+	FromOid = #slim_oid{domain = <<"localhost">>, class = uid, id = <<"uid1">>},
+	ToOid = #slim_oid{domain = <<"localhost">>, class = uid, id = <<"uid2">>},
 	Params = [
 		{<<"id">>, <<"13288371">>},
 		{<<"chatid">>, <<"183838">>},
@@ -54,7 +54,7 @@ new_message() ->
 	slim_message:make(chat, FromOid, ToOid, Params).
 
 new_presence() ->
-    FromOid = #slim_oid{domain = <<"localhost">>, class = vid, name = <<"v1291">>},
+    FromOid = #slim_oid{domain = <<"localhost">>, class = vid, id = <<"v1291">>},
     Params = [
         {<<"nick">>, <<"V1291">>},
         {<<"show">>, <<"available">>},
