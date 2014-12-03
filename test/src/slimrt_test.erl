@@ -15,19 +15,19 @@ run(0, _Max) ->
 	done;
 
 run(I, Max) ->
-    Name = integer_to_list(I),
-    Nick = lists:concat(["user", Name]),
+    Id = integer_to_list(I),
+    Nick = lists:concat(["user", Id]),
     Buddies = [integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 20)],
     Rooms = [integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 10)],
     Params = [
+        {"id", Id}, 
         {"domain", ?DOMAIN}, 
-        {"name", Name}, 
         {"nick", Nick}, 
         {"buddies", string:join(Buddies, ",")}, 
         {"rooms", string:join(Rooms, ",")}
     ],
     Body = string:join([lists:concat([K, "=", V]) || {K, V} <- Params], "&"),
-    Request = {?SERVER ++ "/online", headers(), "application/x-www-form-urlencoded", Body},
+    Request = {?SERVER ++ "/endpoints/online", headers(), "application/x-www-form-urlencoded", Body},
     io:format("~p~n", [Request]),
     Profile = profile(I),
     inets:start(httpc, [{profile, Profile}, {timeout, 120000}]),

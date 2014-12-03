@@ -495,6 +495,7 @@ handle_info({idle_timeout, Ticket}, #state{tickets = Tickets} = State) ->
 	case length(Tickets1) of
 	0 ->
 		Ref = send_after(?IDLE_TIMEOUT, self(), idle_timeout),
+		%NOTICE: hibernate when no tickets?
 		{noreply, State#state{idle_timer = Ref, tickets = []}, hibernate};
 	_ ->
 		{noreply, State#state{tickets = Tickets1}}
