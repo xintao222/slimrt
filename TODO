@@ -2,4 +2,3 @@ eunit
 
 {cover_enabled, true}.
 
-how to handle endpoint properties ?

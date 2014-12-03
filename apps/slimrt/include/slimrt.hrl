@@ -51,7 +51,7 @@
 -record(slim_endpoint, {
     oid		:: oid(), 
     nick	:: binary(),
-    show = available	:: presence_show(),
+    show	:: binary(), % <<"available">> 
 	status	:: binary()
 }).
 
@@ -91,7 +91,7 @@
 	oid		:: oid(),
 	pid		:: pid(),
 	mon		:: reference(),
-	show	:: presence_show()
+	show	:: binary()
 }).
 
 -type route() :: #slim_route{}.

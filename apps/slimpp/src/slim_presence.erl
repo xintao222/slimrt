@@ -35,7 +35,7 @@ make([], Presence) ->
 make([{<<"nick">>, Nick} | Params], Presence) ->
 	make(Params, Presence#slim_presence{nick = Nick});
 make([{<<"show">>, Show} | Params], Presence) ->
-	make(Params, Presence#slim_presence{show = binary_to_atom(Show, utf8)});
+	make(Params, Presence#slim_presence{show = Show});
 make([{<<"status">>, Status} | Params], Presence) ->
 	make(Params, Presence#slim_presence{status = Status});
 make([_ | Params], Presence) ->
