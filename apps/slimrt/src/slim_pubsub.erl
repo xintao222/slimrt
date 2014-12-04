@@ -156,7 +156,6 @@ handle_call(Req, _From, State) ->
 	{stop, {badreq, Req}, State}.
 
 handle_cast({unsubscribe, Topic, SubPid}, State) ->
-	%?INFO("unsubscribe: ~s", [Topic]),
 	ets:delete_object(topic_subscriber, #topic_subscriber{topic=Topic, subpid=SubPid}),
 	try_remove_topic(Topic),
 	{noreply, State};
@@ -191,11 +190,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 try_remove_topic(Name) when is_binary(Name) ->
-	?INFO("try_remove_topic: ~s", [Name]),
 	case ets:member(topic_subscriber, Name) of
 	false -> 
 		Topic = slim_topic:new(Name),
-		?INFO("do remove: ~p", [Topic]),
+		%?INFO("do remove: ~p", [Topic]),
 		Fun = fun() -> 
 			mnesia:delete_object(Topic),
 			case mnesia:read(topic, Name) of
@@ -203,8 +201,7 @@ try_remove_topic(Name) when is_binary(Name) ->
 			_ -> ignore
 			end
 		end,
-		Res = mnesia:transaction(Fun),
-		?INFO("~p", [Res]);
+		mnesia:transaction(Fun);
 	true -> 
 		ok
 	end.

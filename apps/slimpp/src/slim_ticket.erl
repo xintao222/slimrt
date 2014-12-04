@@ -25,35 +25,36 @@
 -include("slimpp.hrl").
 
 -export([make/1, make/2, make/3,
-		 encode/1]).
+		 encode/1,
+		 s/1]).
 
 %%
 %% @doc gererate ticket record from string
 %%
 -spec make(Ticket :: binary()) -> ticket().
 make(Ticket) when is_binary(Ticket) ->
-	[Class, Name, Token] = binary:split(Ticket, <<":">>, [global]), 
-	#slim_ticket{class=binary_to_atom(Class, utf8), name=Name, token = Token}.
+	[Class, Id, Token] = binary:split(Ticket, <<":">>, [global]), 
+	#slim_ticket{class=binary_to_atom(Class, utf8), id = Id, token = Token}.
     
 %%
-%% @doc generate ticket with class and name
+%% @doc generate ticket with class and id
 %%
--spec make(Class :: oid_class(), Name :: binary()) -> ticket().
-make(Class, Name) when is_atom(Class) and is_binary(Name) ->
-	make(Class, Name, token()).
+-spec make(Class :: oid_class(), Id :: binary()) -> ticket().
+make(Class, Id) when is_atom(Class) and is_binary(Id) ->
+	make(Class, Id, token()).
 
 %%
-%% @doc generate ticket with class, name and token
+%% @doc generate ticket with class, id and token
 %%
--spec make(Class :: oid_class(), Name :: binary(), Token :: binary()) 
+-spec make(Class :: oid_class(), Id :: binary(), Token :: binary()) 
 	-> ticket().
-make(Class, Name, Token) when is_atom(Class) 
-	and is_binary(Name) and is_binary(Token) ->
-	#slim_ticket{class = Class, name = Name, token = Token}.
+make(Class, Id, Token) when is_atom(Class) 
+	and is_binary(Id) and is_binary(Token) ->
+	#slim_ticket{class = Class, id = Id, token = Token}.
 
 -spec encode(Ticket :: ticket()) -> binary().
-encode(#slim_ticket{class = Class, name = Name, token = Token}) ->
-	list_to_binary([atom_to_list(Class), ":", Name, ":", Token]).
+encode(#slim_ticket{class = Class, id = Id, token = Token}) ->
+	list_to_binary([atom_to_list(Class), ":", Id, ":", Token]).
 
 token() ->
 	random:seed(now()),
@@ -61,4 +62,7 @@ token() ->
 	I2 = random:uniform(round(math:pow(2, 32))) - 1, 
 	L = lists:flatten(io_lib:format("~12.16.0b~8.16.0b", [I1, I2])),
 	list_to_binary(L).
+
+s(Ticket) when ?is_ticket(Ticket) ->
+	encode(Ticket).
 

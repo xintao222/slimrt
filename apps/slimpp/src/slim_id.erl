@@ -33,13 +33,13 @@ parse(S) when is_binary(S) ->
 	[Id] -> {uid, Id}
 	end.
 
-from(#slim_oid{class=uid, name=Name}) ->
-	Name;
+from(#slim_oid{class=uid, id=Id}) ->
+	Id;
 
-from(#slim_oid{class=gid, name=Name}) ->
-	Name;
+from(#slim_oid{class=gid, id=Id}) ->
+	Id;
 
-from(#slim_oid{class=Cls, name=Name}) ->
-	list_to_binary([atom_to_list(Cls), ":", Name]).
+from(#slim_oid{class=Cls, id=Id}) ->
+	list_to_binary([atom_to_list(Cls), ":", Id]).
 
 

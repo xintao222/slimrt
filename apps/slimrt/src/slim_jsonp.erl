@@ -30,44 +30,44 @@
 
 -include("slim_log.hrl").
 
+-import(proplists, [get_value/2]).
+
 -export([handle/2]).
 
 -export([polling/2]).
 
--record(state, {callback = <<>>, ticket, endpoint}).
+-record(state, {callback = <<>>, ticket}).
 
 handle(Params, Req) ->
-	?INFO("Jsonp request: ~p", [Params]),
-    Ticket = slim_ticket:make(proplists:get_value(<<"ticket">>, Params)),
-	case slim_cm:lookup(Ticket) of
-	Pid when is_pid(Pid) ->
-		slim_client:subscribe(Pid, Ticket),
+    Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
+	case slim_client:subscribe(Ticket, self()) of
+	ok -> 
 		Callback = proplists:get_value(<<"callback">>, Params, <<>>), 
-		State = #state{callback = Callback, ticket = Ticket, endpoint = Pid},
+		State = #state{callback = Callback, ticket = Ticket},
 		polling(Req, State);
-	undefined -> 
-		JSON = slim_json:encode([{status, <<"stopped">>}, {error, <<"Ticket not bound">>}]),
-		Req:respond({404, [], JSON})
+	{error, Code, Reason} -> 
+		JSON = slim_json:encode([{status, <<"stopped">>}, {error, Reason}]),
+		Req:respond({Code, [], JSON})
 	end.
 
-%%FIXME Later...
-polling(Req, #state{callback = CB, ticket = Ticket, endpoint = Pid}) ->
+%%FIXME Later... this process should be hibernate...
+polling(Req, #state{callback = CB, ticket = Ticket}) ->
     Response = 
 	receive
 		{ok, Packets} ->
-            ?INFO("packets: ~p", [Packets]),
+            ?DEBUG("polling received packets: ~p", [Packets]),
 			reply(CB, slim_packet:encode(Packets), Req);
 		stop ->
-            ?INFO_MSG("stop..."),
+            ?DEBUG_MSG("polling received 'stop'"),
 			reply(CB, slim_json:encode([{status, stopped}]), Req);
 		Other->
-			?ERROR("polling got: ~p", [Other]),
+			?ERROR("polling received unexpected: ~p", [Other]),
 			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
         after ?POLL_TIMEOUT ->  
-			?ERROR("polling timeout... ~p", [Ticket]),
+			?DEBUG("polling timeout... ~s", [slim_ticket:s(Ticket)]),
 			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
 	end,
-    slim_client:unsubscribe(Pid, Ticket),
+    slim_client:unsubscribe(Ticket, self()),
     Response.
 
 reply(<<>>, JSON, Req) ->
@@ -76,4 +76,5 @@ reply(<<>>, JSON, Req) ->
 reply(CB, JSON, Req) ->
     JS = list_to_binary([CB, "(", JSON, ")"]),
 	Req:ok({"application/javascript", JS}).
+
 

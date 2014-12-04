@@ -31,10 +31,10 @@
 make_test() ->
     Presence = new_presence(),
     ?debugFmt("~p", [Presence]),
-    ?assertMatch(#slim_presence{ show = available }, Presence).
+    ?assertMatch(#slim_presence{ show = <<"available">> }, Presence).
 
 new_presence() ->
-    FromOid = #slim_oid{domain = <<"localhost">>, class=vid, name = <<"v1291">>},
+    FromOid = #slim_oid{domain = <<"localhost">>, class=vid, id = <<"v1291">>},
     Params = [
         {<<"nick">>, <<"V1291">>},
         {<<"show">>, <<"available">>},
@@ -46,7 +46,7 @@ list_test() ->
     List = slim_presence:list(new_presence()),
     ?debugFmt("~p", [List]),
     ?assertEqual(<<"V1291">>, proplists:get_value(nick, List)),
-    ?assertEqual(available, proplists:get_value(show, List)).
+    ?assertEqual(<<"available">>, proplists:get_value(show, List)).
 
 -endif.
 

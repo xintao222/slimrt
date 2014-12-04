@@ -1,5 +1,6 @@
 .eunit
 deps
+!deps/.placeholder
 rel/slimrt
 *.o
 *.beam

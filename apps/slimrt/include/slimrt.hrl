@@ -34,10 +34,10 @@
     ticket		:: ticket(),
 	cid			:: binary(), %Not used: client id
     cname		:: binary(), %Not used: client name
-    pid			:: pid(),
-    ref			:: reference(),
-    mon			:: reference(),
-    type		:: atom(),
+    ref			:: reference(), %%idle timer ref
+    pid			:: pid(), %subscriber pid
+    mon			:: reference(), %subscriber monitor
+    type		:: atom(), %poll, wsocket, mqtt...
     packets=[]	:: list()
 }).
 
@@ -50,11 +50,9 @@
 %%------------------------------------------------------------------------------
 -record(slim_endpoint, {
     oid		:: oid(), 
-    name	:: binary(),
     nick	:: binary(),
-    domain	:: binary(),
-	status	:: binary(),
-    show = available	:: presence_show()
+    show	:: binary(), % <<"available">> 
+	status	:: binary()
 }).
 
 -type endpoint() :: #slim_endpoint{}.
@@ -93,7 +91,7 @@
 	oid		:: oid(),
 	pid		:: pid(),
 	mon		:: reference(),
-	show	:: presence_show()
+	show	:: binary()
 }).
 
 -type route() :: #slim_route{}.

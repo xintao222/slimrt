@@ -73,7 +73,8 @@
 %% slim presence
 %%------------------------------------------------------------------------------
 -type presence_type() :: online | offline | show | subscribe | subscribed | unsubscribe | unsubscribed | hidden.
--type presence_show() :: available | unavailable | chat | away | busy | invisible | atom().
+
+%-type presence_show() :: available | unavailable | chat | away | busy | invisible | binary().
 
 -record(slim_presence, {
 	type	:: presence_type(),
@@ -82,7 +83,7 @@
     client  :: binary(),
 	to		:: oid(),		%% optional
 	priority:: integer(),   %not used, client priority
-	show	:: presence_show(),
+	show	:: binary(),
 	status	:: binary(),
 	ts		:: integer()
 }).

@@ -33,9 +33,9 @@ parse_test() ->
 	?assertEqual({gid, <<"room1">>}, slim_id:parse(<<"gid:room1">>)).
 
 from_test() ->
-	?assertEqual(<<"123">>, slim_id:from(#slim_oid{class=uid, name = <<"123">>})),
-    ?assertEqual(<<"room1">>, slim_id:from(#slim_oid{class=gid, name = <<"room1">>})),
-	?assertEqual(<<"vid:1">>, slim_id:from(#slim_oid{class=vid, name = <<"1">>})).
+	?assertEqual(<<"123">>, slim_id:from(#slim_oid{class=uid, id = <<"123">>})),
+    ?assertEqual(<<"room1">>, slim_id:from(#slim_oid{class=gid, id = <<"room1">>})),
+	?assertEqual(<<"vid:1">>, slim_id:from(#slim_oid{class=vid, id = <<"1">>})).
 
 -endif.
 

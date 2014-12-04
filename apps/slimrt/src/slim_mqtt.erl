@@ -224,9 +224,9 @@ process_request(?CONNECT,
             {_, false} ->
                 {?CONNACK_INVALID_ID, State};
             _ ->
-				Ticket = #slim_ticket{class=Class, name=Name} 
+				Ticket = #slim_ticket{class=Class, id=Id} 
 					= slim_ticket:make(list_to_binary(STicket)),
-				Oid = slim_oid:make(Class, list_to_binary(Domain), Name),
+				Oid = slim_oid:make(Class, list_to_binary(Domain), Id),
 				case slim_cm:lookup(Ticket) of
 				Pid when is_pid(Pid) ->
 					?INFO("connect from clientid: ~s, ~p", [ClientId, AlivePeriod]),

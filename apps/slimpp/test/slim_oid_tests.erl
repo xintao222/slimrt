@@ -29,10 +29,10 @@
 -include_lib("eunit/include/eunit.hrl").
 
 make_test() ->
-	?assertMatch(#slim_oid{domain = <<"localhost">>, class = uid, name = <<"123">>}, slim_oid:make(uid, <<"localhost">>, <<"123">>)).
+	?assertMatch(#slim_oid{domain = <<"localhost">>, class = uid, id = <<"123">>}, slim_oid:make(uid, <<"localhost">>, <<"123">>)).
 
 topic_test() ->
-	Oid = #slim_oid{domain = <<"localhost">>, class = uid, name = <<"123">>},
-	?assertEqual(<<"/domain/localhost/uid/123">>, slim_oid:topic(Oid)).
+	Oid = #slim_oid{domain = <<"localhost">>, class = uid, id = <<"123">>},
+	?assertEqual(<<"/dn/localhost/uid/123">>, slim_oid:topic(Oid)).
 
 -endif.
