@@ -39,7 +39,6 @@
 -record(state, {callback = <<>>, ticket}).
 
 handle(Params, Req) ->
-	?INFO("Jsonp request: ~p", [Params]),
     Ticket = slim_ticket:make(get_value(<<"ticket">>, Params)),
 	case slim_client:subscribe(Ticket, self()) of
 	ok -> 
@@ -56,16 +55,16 @@ polling(Req, #state{callback = CB, ticket = Ticket}) ->
     Response = 
 	receive
 		{ok, Packets} ->
-            ?INFO("packets: ~p", [Packets]),
+            ?DEBUG("polling received packets: ~p", [Packets]),
 			reply(CB, slim_packet:encode(Packets), Req);
 		stop ->
-            ?INFO_MSG("stop..."),
+            ?DEBUG_MSG("polling received 'stop'"),
 			reply(CB, slim_json:encode([{status, stopped}]), Req);
 		Other->
-			?ERROR("polling got: ~p", [Other]),
+			?ERROR("polling received unexpected: ~p", [Other]),
 			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
         after ?POLL_TIMEOUT ->  
-			?ERROR("polling timeout... ~p", [Ticket]),
+			?DEBUG("polling timeout... ~s", [slim_ticket:s(Ticket)]),
 			reply(CB, <<"{\"status\": \"ok\", \"data\":[]}">>, Req)
 	end,
     slim_client:unsubscribe(Ticket, self()),

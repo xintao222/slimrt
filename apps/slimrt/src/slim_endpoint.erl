@@ -206,12 +206,13 @@ send_available(#slim_endpoint{oid = Oid, nick = Nick, show = Show, status = Stat
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 
-%%ClientId is not used...
+%%TODO: ClientId is not used... version 0.2 support...
 handle_call({bind, _ClientId}, _From, State = #state{endpoint = Endpoint, idle_timer = IdleTimer, tickets = Tickets}) ->
 	#slim_endpoint{oid = Oid} = Endpoint,
 	#slim_oid{domain = Domain, class = Cls, id = Id} = Oid,
     Ticket = slim_ticket:make(Cls, Id),
-	?INFO("bind ~p to ~p", [Ticket, Oid]),
+	%%TODO: fixme
+	?DEBUG("endpoint[~s]: bind ~s", [slim_oid:s(Oid), slim_ticket:s(Ticket)]),
 	cancel_timer(IdleTimer),
 	undefined = get(Ticket),
 	Ref = send_after(?IDLE_TIMEOUT, self(), {idle_timeout, Ticket}),
@@ -222,7 +223,7 @@ handle_call({bind, _ClientId}, _From, State = #state{endpoint = Endpoint, idle_t
     {reply, {ok, Ticket}, State#state{idle_timer = undefined, tickets = [Ticket|Tickets]}};
 
 handle_call({unbind, Ticket}, _From,  State = #state{endpoint = #slim_endpoint{oid = Oid}, tickets = Tickets}) ->
-	?INFO("unbind ~p from ~p", [Ticket, Oid]),
+	?DEBUG("endpoint[~s]: unbind ~s", [slim_oid:s(Oid), slim_ticket:s(Ticket)]),
 	NewState = 
 	case get(Ticket) of
     Client when ?is_client(Client) ->
@@ -293,10 +294,10 @@ handle_call(Req, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-handle_cast({subscribe, Ticket, CPid}, State) ->
+handle_cast({subscribe, Ticket, CPid}, State = #state{endpoint = #slim_endpoint{oid = Oid}}) ->
 	case get(Ticket) of
 	Client when is_record(Client, slim_client) ->
-		?DEBUG("subscribe ~p, ~p", [Ticket, CPid]),
+		?DEBUG("endpoint[~s]: subscribe ~s with ~p", [slim_oid:s(Oid), slim_ticket:s(Ticket), CPid]),
 		cancel_timer(Client#slim_client.ref),
 		%TODO: FIX ME UNDEFINED
 		try_demonitor(Client#slim_client.mon),
@@ -327,12 +328,12 @@ handle_cast({subscribe, Ticket, CPid}, State) ->
 	end,
 	{noreply, State, hibernate};
 
-handle_cast({unsubscribe, Ticket, CPid}, State) ->
+handle_cast({unsubscribe, Ticket, CPid}, State = #state{endpoint = #slim_endpoint{oid = Oid}}) ->
     case get(Ticket) of
     Client when is_record(Client, slim_client)->
 		if
 		(Client#slim_client.pid == undefined) or (Client#slim_client.pid == CPid) ->
-			?DEBUG("unsubscribe ~p ~p", [Ticket, CPid]),
+			?DEBUG("endpoint[~s]: unsubscribe ~s with ~p", [slim_oid:s(Oid), slim_ticket:s(Ticket), CPid]),
 			%TODO: FIX ME UNDEFINED
 			try_demonitor(Client#slim_client.mon),
 			cancel_timer(Client#slim_client.ref),
@@ -343,7 +344,7 @@ handle_cast({unsubscribe, Ticket, CPid}, State) ->
             ?ERROR("~p cannot not unsubscribe ~p", [CPid, Client#slim_client.pid])
         end;
     undefined ->
-		?ERROR("unsubscribed ticket is not existed: ~p", [Ticket])
+		?ERROR("unsubscribed ticket not existed: ~s", [slim_ticket:s(Ticket)])
     end,
 	{noreply, State};
 
@@ -441,7 +442,7 @@ handle_cast(Msg, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 handle_info({dispatch, Packet}, State = #state{endpoint = #slim_endpoint{oid = Oid}, tickets = Tickets}) ->
-	?INFO("~p Got Packet: ~n~p", [Oid, Packet]),
+	?DEBUG("endpoint[~s]: dispatch packet ~n~p", [slim_oid:s(Oid), Packet]),
 	case Packet of
 	%from group chat topic
 	#slim_message{from = Oid, type = grpchat} ->
@@ -468,8 +469,8 @@ handle_info({'DOWN', Mon, _Type, _Object, _Info}, #state{tickets = Tickets} = St
 	end,
 	{noreply, State};
 
-handle_info({idle_timeout, Ticket}, #state{tickets = Tickets} = State) ->
-	?INFO("idle_timeout: ~p", [Ticket]),
+handle_info({idle_timeout, Ticket}, #state{endpoint = #slim_endpoint{oid = Oid}, tickets = Tickets} = State) ->
+	?DEBUG("endpoint[~s]: ticket ~s idle_timeout ", [slim_oid:s(Oid), slim_ticket:s(Ticket)]),
     case get(Ticket) of
     undefined ->
         ?ERROR("assert failure: cannot idle_timeout ticket: ~p", [Ticket]);
@@ -535,7 +536,7 @@ terminate(_Reason, #state{endpoint = Endpoint}) ->
 	slim_roster:remove(Oid),
 	slim_grpchat:leave(Oid, self()),
     slim_router:unregister(Oid),
-    ?DEBUG("endpoint terminated: ~p", [slim_oid:topic(Oid)]),
+    ?DEBUG("endpoint[~s]: terminated.", [slim_oid:s(Oid)]),
     ok.
 
 %%--------------------------------------------------------------------

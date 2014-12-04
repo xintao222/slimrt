@@ -62,6 +62,7 @@ start(Opts) ->
 %% @doc http callback
 %%
 handle(Req) ->
+	throw({error, testMochiweb}),
 	handle(Req:get(path), Req).
 
 handle("/" ++ ?APIVSN ++ Path, Req) ->
@@ -93,7 +94,7 @@ handle('POST', {"endpoints", "online"}, Params, Req) ->
     EpOid = slim_oid:make(Cls, Domain, Id),
 	case slim_client:online(EpOid, Params) of
 	{ok, Result} ->
-		?DEBUG("online result: ~p", [Result]),
+		?DEBUG("~p", [Result]),
 		ok(Result, Req);
 	{error, Code, Reason} ->
 		reply(Code, Reason, Req)
@@ -271,7 +272,7 @@ ok(Req) ->
 	Json = slim_json:encode([{status, ok}]),
 	Req:ok({"application/json", Json}).
 
-ok(Req, Data) ->
+ok(Data, Req) ->
 	Json = slim_json:encode([{status, ok}, {data, Data}]),
 	Req:ok({"application/json", Json}).
 

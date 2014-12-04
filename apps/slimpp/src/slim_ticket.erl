@@ -25,7 +25,8 @@
 -include("slimpp.hrl").
 
 -export([make/1, make/2, make/3,
-		 encode/1]).
+		 encode/1,
+		 s/1]).
 
 %%
 %% @doc gererate ticket record from string
@@ -61,4 +62,7 @@ token() ->
 	I2 = random:uniform(round(math:pow(2, 32))) - 1, 
 	L = lists:flatten(io_lib:format("~12.16.0b~8.16.0b", [I1, I2])),
 	list_to_binary(L).
+
+s(Ticket) when ?is_ticket(Ticket) ->
+	encode(Ticket).
 

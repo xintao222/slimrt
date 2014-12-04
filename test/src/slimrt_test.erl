@@ -17,8 +17,8 @@ run(0, _Max) ->
 run(I, Max) ->
     Id = integer_to_list(I),
     Nick = lists:concat(["user", Id]),
-    Buddies = [integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 20)],
-    Rooms = [integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 10)],
+    Buddies = unique([integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 20)]),
+    Rooms = unique([integer_to_list(random:uniform(Max)) || _I <- lists:seq(1, 10)]),
     Params = [
         {"id", Id}, 
         {"domain", ?DOMAIN}, 
@@ -68,4 +68,14 @@ headers() ->
     Auth = base64:encode_to_string(?DOMAIN ++ ":" ++ ?APIKEY), 
     [{"Authorization", "Basic " ++  Auth}].
     
+unique(L) ->
+	unique(L, []).
 
+unique([], Acc) ->
+	Acc;
+unique([H|T], Acc) ->
+	case lists:member(H, Acc) of
+	true -> unique(T, Acc);
+	false -> unique(T, [H|Acc])
+	end.
+	

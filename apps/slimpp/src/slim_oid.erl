@@ -28,7 +28,8 @@
          class/1,
          domain/1,
          id/1,
-         topic/1]).
+         topic/1,
+		 s/1]).
 
 %Example: {<<"/dn/$domain/$class/$id">>, <<"$domain">>, $class, <<"$id">>}
 
@@ -66,5 +67,7 @@ id(Oid) when is_record(Oid, slim_oid) -> Oid#slim_oid.id.
 topic(#slim_oid{domain=Domain, class=Class, id=Id}) ->
     list_to_binary(["/dn/", Domain, "/", atom_to_list(Class), "/", Id]).
 
+-spec s(Oid :: oid()) -> binary().
+s(Oid) -> topic(Oid).
 
 
