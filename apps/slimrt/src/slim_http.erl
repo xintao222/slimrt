@@ -53,7 +53,8 @@
 %%
 start(Opts) ->
 	Port = get_value(port, Opts, 8080),
-	case mochiweb:start_http(Port, {?MODULE, handle, []}) of
+	Opts1 = proplists:delete(port, Opts),
+	case mochiweb:start_http(Port, Opts1, {?MODULE, handle, []}) of
     {ok, Pid} -> {ok, Pid};
     {error,{already_started, Pid}} -> {ok, Pid}
     end.
@@ -62,7 +63,6 @@ start(Opts) ->
 %% @doc http callback
 %%
 handle(Req) ->
-	throw({error, testMochiweb}),
 	handle(Req:get(path), Req).
 
 handle("/" ++ ?APIVSN ++ Path, Req) ->
