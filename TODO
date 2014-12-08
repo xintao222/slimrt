@@ -2,3 +2,4 @@ eunit
 
 {cover_enabled, true}.
 
+mochiweb_socket_server how to handle execption???
