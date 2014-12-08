@@ -67,6 +67,12 @@ new(Name) when is_binary(Name) ->
 -spec type(Topic :: topic()) -> direct | wildcard.
 type(#topic{name=Name}) when is_binary(Name) ->
 	type(words(Name));
+type([]) -> direct;
+type([Word|T]) -> 
+	case type(Word) of
+		direct -> type(T);
+		wildcard -> wildcard
+	end;
 type(<<>>) ->
 	direct;
 type(<<$#, _/binary>>) ->

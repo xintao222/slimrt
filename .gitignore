@@ -7,7 +7,6 @@ rel/slimrt
 *.plt
 erl_crash.dump
 ebin
-rel/example_project
 .concrete/DEV_MODE
 .rebar
 test/ebin/*.beam
