@@ -20,6 +20,8 @@
 
 -define(PROTOCOL_VERSION, "MQTT/3.1").                                                 
 
+-define(PROTOCOL_NAMES,  [{3, "MQIsdp"}, {4, "MQTT"}]).
+
 -define(CLIENT_ID_MAXLEN, 23).
 
 -define(MQTT_PROTO_MAJOR, 3).

@@ -25,7 +25,6 @@
 -export([serialise/1]).
 
 -define(RESERVED, 0).
--define(PROTOCOL_MAGIC, "MQIsdp").
 -define(MAX_LEN, 16#fffffff).
 -define(HIGHBIT, 2#10000000).
 -define(LOWBITS, 2#01111111).
@@ -60,7 +59,7 @@ parse_frame(Bin, #mqtt_frame_fixed{ type = Type,
                                     qos  = Qos } = Fixed, Length) ->
     case {Type, Bin} of
         {?CONNECT, <<FrameBin:Length/binary, Rest/binary>>} ->
-            {ProtocolMagic, Rest1} = parse_utf(FrameBin),
+            {ProtoName, Rest1} = parse_utf(FrameBin),
             <<ProtoVersion : 8, Rest2/binary>> = Rest1,
             <<UsernameFlag : 1,
               PasswordFlag : 1,
@@ -76,7 +75,7 @@ parse_frame(Bin, #mqtt_frame_fixed{ type = Type,
             {WillMsg,   Rest6} = parse_msg(Rest5, WillFlag),
             {UserName,  Rest7} = parse_utf(Rest6, UsernameFlag),
             {PasssWord, <<>>}  = parse_utf(Rest7, PasswordFlag),
-            case ProtocolMagic == ?PROTOCOL_MAGIC of
+            case protocol_name_approved(ProtoVersion, ProtoName) of
                 true ->
                     wrap(Fixed,
                          #mqtt_frame_connect{
@@ -257,4 +256,5 @@ opt(false)                -> 0;
 opt(true)                 -> 1;
 opt(X) when is_integer(X) -> X.
 
-
+protocol_name_approved(Ver, Name) ->
+    lists:member({Ver, Name}, ?PROTOCOL_NAMES).
